@@ -1,23 +1,30 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getPortfolios, Portfolio } from "./lib/api";
 import { PortfolioCard } from "./components/PortfolioCard";
 import { MarketScope } from "./components/MarketScope";
 import { PortfolioVsMarket } from "./components/PortfolioVsMarket";
+import { NewPortfolioForm } from "./components/NewPortfolioForm";
 
 export default function Dashboard() {
   // Trzy stany zycia danych: ladowanie -> (sukces | blad).
   const [portfolios, setPortfolios] = useState<Portfolio[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // useEffect z pusta lista zaleznosci = uruchom raz, gdy komponent wejdzie.
-  // fetch leci z PRZEGLADARKI -> bez CORS na backendzie przegladarka tu zablokuje.
-  useEffect(() => {
+  // reload = jedno zrodlo prawdy: pobiera liste portfeli. Kazda mutacja
+  // (utworz/dodaj/usun) wola to po sobie, wiec UI zawsze widzi swiezy stan.
+  const reload = useCallback(() => {
     getPortfolios()
       .then(setPortfolios)
       .catch((e) => setError(e.message ?? "Brak polaczenia z API"));
   }, []);
+
+  // Uruchom raz, gdy komponent wejdzie. fetch leci z PRZEGLADARKI -> bez CORS
+  // na backendzie przegladarka tu zablokuje.
+  useEffect(() => {
+    reload();
+  }, [reload]);
 
   return (
     <main className="mx-auto max-w-7xl px-6 py-16">
@@ -43,6 +50,9 @@ export default function Dashboard() {
         <span className="text-accent">$</span> ./portfolios --list
       </p>
 
+      {/* Tworzenie portfela - zawsze dostepne, nad lista */}
+      <NewPortfolioForm onChanged={reload} />
+
       {/* STANY */}
       {error ? (
         <ErrorPanel message={error} />
@@ -54,7 +64,7 @@ export default function Dashboard() {
         <>
           <section className="mb-12 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             {portfolios.map((p) => (
-              <PortfolioCard key={p.id} portfolio={p} />
+              <PortfolioCard key={p.id} portfolio={p} onChanged={reload} />
             ))}
           </section>
 
@@ -91,7 +101,7 @@ function ErrorPanel({ message }: { message: string }) {
 function EmptyPanel() {
   return (
     <div className="cyber-chamfer border border-border bg-card p-8 font-mono text-sm text-muted-foreground">
-      <span className="text-accent">$</span> brak portfeli w bazie — utworz pierwszy przez API.
+      <span className="text-accent">$</span> brak portfeli — kliknij „+ nowy portfel" powyzej, zeby zaczac.
     </div>
   );
 }

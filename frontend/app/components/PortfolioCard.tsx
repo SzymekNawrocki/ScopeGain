@@ -2,50 +2,75 @@
 
 import { useEffect, useState } from "react";
 import {
+  deletePortfolio,
+  deletePosition,
   Portfolio,
   PortfolioValuation,
   costBasis,
   getPortfolioValuation,
 } from "../lib/api";
+import { AddPositionForm } from "./AddPositionForm";
 
-// Formatuje liczbe jako kwote (2 miejsca, separatory tysiecy).
 const fmt = (n: number) =>
   n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-// Zysk >= 0 -> neon zielony, strata -> czerwien. Zwraca klase Tailwinda.
 const pnlColor = (n: number | null | undefined) =>
   n == null ? "text-muted-foreground" : n >= 0 ? "text-accent" : "text-destructive";
 
-// Znak + strzalka przed liczba (▲ zysk / ▼ strata).
 const sign = (n: number) => (n >= 0 ? "▲ +" : "▼ ");
 
-export function PortfolioCard({ portfolio }: { portfolio: Portfolio }) {
-  // Wycena dociagana osobno dla KAZDEJ karty - komponent sam o siebie dba.
+export function PortfolioCard({
+  portfolio,
+  onChanged,
+}: {
+  portfolio: Portfolio;
+  onChanged: () => void;
+}) {
   const [val, setVal] = useState<PortfolioValuation | null>(null);
+  const [confirmDel, setConfirmDel] = useState(false);
+
+  // Podpis pozycji: zmienia sie, gdy cos dodasz/usuniesz -> wycena sie przelicza.
+  const sig = portfolio.positions.map((p) => `${p.id}:${p.quantity}:${p.buy_price}`).join(",");
 
   useEffect(() => {
     let aktualne = true;
+    setVal(null);
     getPortfolioValuation(portfolio.id)
       .then((v) => aktualne && setVal(v))
-      .catch(() => {}); // brak wyceny -> zostaje sam koszt wejscia (nizej)
+      .catch(() => {});
     return () => {
       aktualne = false;
     };
-  }, [portfolio.id]);
+  }, [portfolio.id, sig]);
 
-  // Mapa ticker -> policzona pozycja, zeby dokleic cene/zysk do wiersza.
   const wyceny = new Map(val?.positions.map((p) => [p.id, p]) ?? []);
+
+  async function usunPozycje(positionId: number) {
+    try {
+      await deletePosition(portfolio.id, positionId);
+      onChanged();
+    } catch {
+      /* ciche - lista i tak sie odswiezy przy nastepnej akcji */
+    }
+  }
+
+  async function usunPortfel() {
+    try {
+      await deletePortfolio(portfolio.id);
+      onChanged();
+    } catch {
+      setConfirmDel(false);
+    }
+  }
 
   return (
     <article className="group relative">
-      {/* Narozne akcenty HUD */}
       <span className="pointer-events-none absolute left-0 top-0 h-3 w-3 border-l-2 border-t-2 border-accent" />
       <span className="pointer-events-none absolute right-0 top-0 h-3 w-3 border-r-2 border-t-2 border-accent" />
       <span className="pointer-events-none absolute bottom-0 left-0 h-3 w-3 border-b-2 border-l-2 border-accent" />
       <span className="pointer-events-none absolute bottom-0 right-0 h-3 w-3 border-b-2 border-r-2 border-accent" />
 
       <div className="cyber-chamfer border border-border bg-card transition-all duration-300 group-hover:border-accent group-hover:shadow-glow">
-        {/* Pasek terminala + odznaka calkowitego zysku */}
         <header className="flex items-center gap-2 border-b border-border bg-muted/40 px-4 py-2">
           <span className="h-2.5 w-2.5 rounded-full bg-destructive" />
           <span className="h-2.5 w-2.5 rounded-full bg-[#ffcc00]" />
@@ -62,40 +87,74 @@ export function PortfolioCard({ portfolio }: { portfolio: Portfolio }) {
         </header>
 
         <div className="p-5">
-          <h2 className="font-display text-xl font-bold uppercase tracking-wide text-foreground text-glow">
-            {portfolio.name}
-          </h2>
+          <div className="flex items-start justify-between gap-2">
+            <h2 className="font-display text-xl font-bold uppercase tracking-wide text-foreground text-glow">
+              {portfolio.name}
+            </h2>
+            {/* Usuwanie portfela: dwuklik (pierwszy pyta, drugi kasuje) */}
+            {confirmDel ? (
+              <div className="flex shrink-0 gap-1">
+                <button
+                  onClick={usunPortfel}
+                  className="cyber-chamfer-sm border border-destructive px-2 py-1 font-mono text-[0.6rem] uppercase text-destructive transition-all hover:bg-destructive hover:text-background"
+                >
+                  na pewno?
+                </button>
+                <button
+                  onClick={() => setConfirmDel(false)}
+                  className="font-mono text-[0.6rem] uppercase text-muted-foreground hover:text-foreground"
+                >
+                  nie
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmDel(true)}
+                aria-label="Usun portfel"
+                className="shrink-0 font-mono text-sm text-muted-foreground transition-colors hover:text-destructive"
+              >
+                usun
+              </button>
+            )}
+          </div>
 
           {/* Pozycje */}
           <div className="mt-4 space-y-1">
             {portfolio.positions.length === 0 ? (
               <p className="font-mono text-sm text-muted-foreground">
-                <span className="text-accent">$</span> brak pozycji — pusty portfel
+                <span className="text-accent">$</span> brak pozycji — dodaj pierwsza nizej
               </p>
             ) : (
               <>
-                <div className="grid grid-cols-[1fr_auto_auto_auto] gap-4 border-b border-border pb-1 font-mono text-[0.65rem] uppercase tracking-[0.2em] text-muted-foreground">
+                <div className="grid grid-cols-[1fr_auto_auto_auto_1.25rem] gap-3 border-b border-border pb-1 font-mono text-[0.65rem] uppercase tracking-[0.2em] text-muted-foreground">
                   <span>Ticker</span>
                   <span className="text-right">Ilosc</span>
                   <span className="text-right">Teraz</span>
                   <span className="text-right">Zysk</span>
+                  <span />
                 </div>
                 {portfolio.positions.map((pos) => {
                   const w = wyceny.get(pos.id);
                   return (
                     <div
                       key={pos.id}
-                      className="grid grid-cols-[1fr_auto_auto_auto] gap-4 py-1 font-mono text-sm"
+                      className="group/row grid grid-cols-[1fr_auto_auto_auto_1.25rem] items-center gap-3 py-1 font-mono text-sm"
                     >
                       <span className="font-bold text-accent-tertiary">{pos.ticker}</span>
                       <span className="text-right text-foreground">{fmt(pos.quantity)}</span>
-                      {/* Dopoki wycena nie doszla - migajacy placeholder */}
                       <span className="text-right text-muted-foreground">
                         {w?.current_price != null ? fmt(w.current_price) : "···"}
                       </span>
                       <span className={`text-right font-bold ${pnlColor(w?.pnl_pct)}`}>
                         {w?.pnl_pct != null ? `${w.pnl_pct >= 0 ? "+" : ""}${fmt(w.pnl_pct)}%` : "···"}
                       </span>
+                      <button
+                        onClick={() => usunPozycje(pos.id)}
+                        aria-label={`Usun ${pos.ticker}`}
+                        className="text-right text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover/row:opacity-100"
+                      >
+                        ×
+                      </button>
                     </div>
                   );
                 })}
@@ -103,7 +162,10 @@ export function PortfolioCard({ portfolio }: { portfolio: Portfolio }) {
             )}
           </div>
 
-          {/* Podsumowanie: koszt wejscia -> wartosc dzis -> zysk/strata */}
+          {/* Dodawanie pozycji */}
+          <AddPositionForm portfolioId={portfolio.id} onChanged={onChanged} />
+
+          {/* Podsumowanie */}
           <footer className="mt-4 space-y-2 border-t border-border pt-3">
             <div className="flex items-baseline justify-between">
               <span className="font-mono text-[0.65rem] uppercase tracking-[0.2em] text-muted-foreground">

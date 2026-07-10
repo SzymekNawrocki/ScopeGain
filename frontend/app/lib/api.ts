@@ -16,14 +16,68 @@ export type Portfolio = {
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
+// Wyciaga czytelny komunikat bledu z odpowiedzi API (pole "detail" od FastAPI).
+async function apiError(res: Response): Promise<string> {
+  try {
+    const body = await res.json();
+    if (typeof body?.detail === "string") return body.detail;
+  } catch {
+    // brak JSON-a w odpowiedzi - trudno, damy sam status
+  }
+  return `API zwrocilo ${res.status}`;
+}
+
 // Pobiera liste portfeli. fetch leci Z PRZEGLADARKI - dlatego backend musi
 // miec wlaczone CORS, inaczej przegladarka zablokuje odpowiedz.
 export async function getPortfolios(): Promise<Portfolio[]> {
   const res = await fetch(`${API_BASE}/portfolios`);
   if (!res.ok) {
-    throw new Error(`API zwrocilo ${res.status}`);
+    throw new Error(await apiError(res));
   }
   return res.json();
+}
+
+// --- Mutacje: tworzenie i kasowanie (zarzadzanie wlasnymi danymi z UI) ---
+
+export async function createPortfolio(name: string): Promise<Portfolio> {
+  const res = await fetch(`${API_BASE}/portfolios`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) throw new Error(await apiError(res));
+  return res.json();
+}
+
+export async function addPosition(
+  portfolioId: number,
+  pos: { ticker: string; quantity: number; buy_price: number },
+): Promise<Position> {
+  const res = await fetch(`${API_BASE}/portfolios/${portfolioId}/positions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(pos),
+  });
+  if (!res.ok) throw new Error(await apiError(res));
+  return res.json();
+}
+
+export async function deletePosition(
+  portfolioId: number,
+  positionId: number,
+): Promise<void> {
+  const res = await fetch(
+    `${API_BASE}/portfolios/${portfolioId}/positions/${positionId}`,
+    { method: "DELETE" },
+  );
+  if (!res.ok) throw new Error(await apiError(res));
+}
+
+export async function deletePortfolio(portfolioId: number): Promise<void> {
+  const res = await fetch(`${API_BASE}/portfolios/${portfolioId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error(await apiError(res));
 }
 
 // Suma "kosztu wejscia" portfela = ile lacznie wydano (ilosc * cena zakupu).

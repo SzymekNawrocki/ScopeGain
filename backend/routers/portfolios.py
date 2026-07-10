@@ -18,8 +18,6 @@ from quant import (
     total_return_pct,
 )
 
-# Ludzka nazwa benchmarku do komunikatow (SPY = ETF na S&P 500).
-BENCHMARK_LABEL = "S&P 500"
 from schemas import (
     PortfolioCreate,
     PortfolioRead,
@@ -28,6 +26,9 @@ from schemas import (
     PositionRead,
     PositionValuation,
 )
+
+# Ludzka nazwa benchmarku do komunikatow (SPY = ETF na S&P 500).
+BENCHMARK_LABEL = "S&P 500"
 
 # prefix="/portfolios" -> wszystkie trasy ponizej dostaja ten przedrostek,
 # wiec w srodku podajemy juz tylko koncowki ("" = samo /portfolios).
@@ -310,6 +311,14 @@ def add_position(
             detail=f"Nie ma portfela o id {portfolio_id}.",
         )
 
+    # Walidacja rynkowa: nie wpuszczamy spolki, ktorej rynek nie zna - inaczej
+    # wycena, backtest i werdykt dostana smiec (spolka bez ceny). {} = brak.
+    if not latest_prices([dane.ticker]):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Nie znaleziono spolki '{dane.ticker.upper()}' na rynku. Sprawdz symbol.",
+        )
+
     pozycja = Position(
         ticker=dane.ticker.upper(),
         quantity=dane.quantity,
@@ -320,3 +329,30 @@ def add_position(
     db.commit()
     db.refresh(pozycja)
     return pozycja
+
+
+# Usuwanie pozycji. 204 = "zrobione, nie mam nic do oddania" (pusty body).
+# Sprawdzamy tez, czy pozycja NALEZY do tego portfela - inaczej ktos moglby
+# skasowac cudza pozycje, podajac zle portfolio_id w adresie.
+@router.delete("/{portfolio_id}/positions/{position_id}", status_code=204)
+def delete_position(
+    portfolio_id: int,
+    position_id: int,
+    db: Session = Depends(get_db),
+):
+    pozycja = db.get(Position, position_id)
+    if pozycja is None or pozycja.portfolio_id != portfolio_id:
+        raise HTTPException(status_code=404, detail="Nie ma takiej pozycji w tym portfelu.")
+    db.delete(pozycja)
+    db.commit()
+
+
+# Usuwanie calego portfela. Pozycje znikaja same dzieki cascade="all,
+# delete-orphan" na relacji w models.py (baza sprzata dzieci za nas).
+@router.delete("/{portfolio_id}", status_code=204)
+def delete_portfolio(portfolio_id: int, db: Session = Depends(get_db)):
+    portfel = db.get(Portfolio, portfolio_id)
+    if portfel is None:
+        raise HTTPException(status_code=404, detail=f"Nie ma portfela o id {portfolio_id}.")
+    db.delete(portfel)
+    db.commit()
