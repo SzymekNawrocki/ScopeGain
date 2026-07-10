@@ -181,8 +181,10 @@ i rozumiem, dlaczego działa.
 - [ ] **Warstwa 4** — Frontend / dashboard ← **START tutaj** (najpierw 4a: endpointy portfela)
 
 **Repo:** https://github.com/SzymekNawrocki/ScopeGain
+**Układ:** monorepo — `backend/` (FastAPI) + `frontend/` (Next.js)
 **Odpalenie lokalnie:**
 - baza: `docker start scopegain-db`
-- API: `.venv\Scripts\python.exe -m uvicorn main:app --reload` → http://127.0.0.1:8000/docs
+- API: `cd backend` → `.venv\Scripts\python.exe -m uvicorn main:app --reload` → http://127.0.0.1:8000/docs
+- front: `cd frontend` → `npm run dev` → http://localhost:3000
 
 _Plik żywy — odhaczam zadania i aktualizuję w miarę postępu._
