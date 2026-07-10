@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plan projektu — Platforma analizy portfela + backtest</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2230; --border:#2a3441;
+    --txt:#e6edf3; --muted:#9aa7b4; --accent:#3fb68b; --accent2:#4c8dff;
+    --warn:#e3b341; --chip:#233043; --shadow:0 8px 30px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg); color:var(--txt);
+    font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+    line-height:1.6; padding:0 0 80px;
+  }
+  .wrap{max-width:920px; margin:0 auto; padding:0 20px}
+
+  header{
+    background:linear-gradient(135deg,#132b26 0%,#0d1117 60%);
+    border-bottom:1px solid var(--border); padding:48px 0 40px; margin-bottom:8px;
+  }
+  header .wrap{max-width:920px}
+  h1{margin:0 0 8px; font-size:1.9rem; letter-spacing:-.5px}
+  .subtitle{color:var(--muted); font-size:1.05rem; margin:0 0 20px}
+  .goal{
+    background:var(--panel); border:1px solid var(--border); border-left:3px solid var(--accent);
+    border-radius:10px; padding:16px 18px; color:var(--txt);
+  }
+
+  .progress-bar-wrap{margin:22px 0 4px}
+  .progress-track{height:10px; background:var(--panel2); border-radius:99px; overflow:hidden; border:1px solid var(--border)}
+  .progress-fill{height:100%; width:0%; background:linear-gradient(90deg,var(--accent),var(--accent2)); transition:width .4s ease}
+  .progress-label{font-size:.85rem; color:var(--muted); margin-top:6px}
+
+  h2{
+    font-size:1.35rem; margin:44px 0 14px; padding-bottom:8px;
+    border-bottom:1px solid var(--border); letter-spacing:-.3px;
+  }
+  h2 .emoji{margin-right:8px}
+
+  .rules{list-style:none; padding:0; margin:0; counter-reset:r}
+  .rules li{
+    counter-increment:r; background:var(--panel); border:1px solid var(--border);
+    border-radius:10px; padding:14px 16px 14px 52px; margin:10px 0; position:relative;
+  }
+  .rules li::before{
+    content:counter(r); position:absolute; left:14px; top:14px;
+    width:26px; height:26px; border-radius:7px; background:var(--chip); color:var(--accent);
+    display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.9rem;
+  }
+
+  table{width:100%; border-collapse:collapse; margin:8px 0; font-size:.94rem}
+  .table-scroll{overflow-x:auto; border:1px solid var(--border); border-radius:10px}
+  th,td{text-align:left; padding:11px 14px; border-bottom:1px solid var(--border)}
+  th{background:var(--panel2); color:var(--muted); font-weight:600; text-transform:uppercase; font-size:.75rem; letter-spacing:.5px}
+  tr:last-child td{border-bottom:none}
+  td strong{color:var(--accent)}
+  tbody tr:hover{background:var(--panel)}
+
+  .cost{background:var(--panel); border:1px solid var(--border); border-left:3px solid var(--warn);
+    border-radius:10px; padding:14px 16px; margin:16px 0; color:var(--txt)}
+
+  pre{
+    background:#0a0e14; border:1px solid var(--border); border-radius:10px;
+    padding:18px; overflow-x:auto; font-size:.82rem; line-height:1.5;
+    color:#8fb4c9; font-family:'Cascadia Code',Consolas,monospace;
+  }
+
+  .layer{
+    background:var(--panel); border:1px solid var(--border); border-radius:12px;
+    padding:0; margin:16px 0; overflow:hidden; box-shadow:var(--shadow);
+  }
+  .layer-head{
+    display:flex; align-items:center; gap:12px; padding:16px 18px; cursor:pointer;
+    user-select:none; background:var(--panel2); border-bottom:1px solid transparent;
+  }
+  .layer.open .layer-head{border-bottom-color:var(--border)}
+  .layer-num{
+    flex:0 0 auto; width:34px; height:34px; border-radius:9px; background:var(--chip);
+    color:var(--accent2); display:flex; align-items:center; justify-content:center; font-weight:800;
+  }
+  .layer-title{flex:1; font-weight:700; font-size:1.05rem}
+  .layer-meta{font-size:.8rem; color:var(--muted); margin-top:2px; font-weight:400}
+  .chevron{color:var(--muted); transition:transform .25s; font-size:.9rem}
+  .layer.open .chevron{transform:rotate(90deg)}
+  .layer-body{display:none; padding:16px 18px 18px}
+  .layer.open .layer-body{display:block}
+
+  .tasks{list-style:none; padding:0; margin:0 0 14px}
+  .tasks li{display:flex; align-items:flex-start; gap:10px; padding:6px 0}
+  .tasks input{margin-top:5px; width:16px; height:16px; accent-color:var(--accent); cursor:pointer; flex:0 0 auto}
+  .tasks label{cursor:pointer}
+  .tasks input:checked + label{color:var(--muted); text-decoration:line-through}
+
+  .note{border-radius:8px; padding:10px 12px; margin:8px 0; font-size:.9rem}
+  .note.zaskok{background:rgba(63,182,139,.1); border:1px solid rgba(63,182,139,.3)}
+  .note.teoria{background:rgba(76,141,255,.09); border:1px solid rgba(76,141,255,.25)}
+  .note b{color:var(--txt)}
+
+  .status-here{
+    background:linear-gradient(135deg,rgba(63,182,139,.15),rgba(76,141,255,.1));
+    border:1px solid var(--accent); border-radius:12px; padding:18px 20px; margin:24px 0;
+    display:flex; align-items:center; gap:14px;
+  }
+  .status-here .dot{width:12px;height:12px;border-radius:99px;background:var(--accent);
+    box-shadow:0 0 0 4px rgba(63,182,139,.2); flex:0 0 auto; animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+  .reset-btn{background:transparent; border:1px solid var(--border); color:var(--muted);
+    padding:8px 14px; border-radius:8px; cursor:pointer; font-size:.85rem; margin-top:12px}
+  .reset-btn:hover{border-color:var(--accent); color:var(--accent)}
+
+  footer{text-align:center; color:var(--muted); font-size:.85rem; margin-top:50px}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>🚀 Plan projektu — Platforma analizy portfela + backtest</h1>
+    <p class="subtitle">Jedna pełnoprawna aplikacja full-stack. Backend · DevOps · chmura · fintech · security — warstwa po warstwie.</p>
+    <div class="goal">
+      <b>Cel:</b> zbudować JEDNĄ działającą aplikację, na której nauczę się wszystkiego naraz — ale
+      po kolei, aż każda warstwa zaskoczy. Wszystko za darmo lub za grosze.
+      <b>Co obronię na rozmowie:</b> wdrożony produkt z CI/CD, monitoringiem i testami — nie kolejne repo z tutorialem.
+    </div>
+    <div class="progress-bar-wrap">
+      <div class="progress-track"><div class="progress-fill" id="pfill"></div></div>
+      <div class="progress-label"><span id="pcount">0</span> / <span id="ptotal">0</span> zadań ukończonych — <span id="ppct">0%</span></div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <h2><span class="emoji">🎯</span>Czym będzie aplikacja</h2>
+  <p>Platforma do analizy portfela inwestycyjnego, która:</p>
+  <ul>
+    <li>pobiera dane rynkowe (kursy spółek / ETF-ów),</li>
+    <li>liczy metryki (zwroty, ryzyko, korelacje),</li>
+    <li>pokazuje dashboard z wykresami,</li>
+    <li>pozwala przetestować prostą strategię na danych historycznych (backtest),</li>
+    <li>stoi w chmurze pod realnym adresem i wdraża się sama po <code>git push</code>.</li>
+  </ul>
+
+  <h2><span class="emoji">🧱</span>Zasady pracy <span style="font-size:.8rem;color:var(--muted);font-weight:400">(czytać przed każdą sesją)</span></h2>
+  <ol class="rules">
+    <li><b>Jedna warstwa naraz.</b> Nie dokładam kolejnej, dopóki obecna nie zaskoczy.</li>
+    <li><b>Teoria wywołana praktyką.</b> Utykam na pojęciu → czytam TYLKO to pojęcie → stosuję → wracam. Nie uczę się „na zapas".</li>
+    <li><b>Najpierw brzydko, że działa. Potem ładnie.</b> Refactor przychodzi później.</li>
+    <li><b>Każda warstwa = osobny zaskok.</b> „Fajny efekt" pojawia się już przy warstwie 4.</li>
+    <li><b>Nie robię wszystkiego naraz</b> — to jedyny sposób, żeby się wypalić.</li>
+  </ol>
+
+  <h2><span class="emoji">🛠️</span>Stack technologiczny</h2>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Warstwa</th><th>Wybór</th><th>Po co</th></tr></thead>
+    <tbody>
+      <tr><td>Język backendu</td><td><strong>Python 3.12</strong></td><td>Ten sam język do API i do algorytmów inwestycyjnych</td></tr>
+      <tr><td>Framework API</td><td><strong>FastAPI</strong></td><td>Nowoczesny, szybki, auto-dokumentacja API</td></tr>
+      <tr><td>Dane rynkowe</td><td><strong>yfinance</strong></td><td>Za darmo, jedna linijka pobiera historię kursu</td></tr>
+      <tr><td>Obliczenia / quant</td><td><strong>pandas + numpy</strong></td><td>Standard branży — zwroty, ryzyko, backtest</td></tr>
+      <tr><td>Baza danych</td><td><strong>PostgreSQL</strong></td><td>Baza nr 1 w fintechu</td></tr>
+      <tr><td>ORM + migracje</td><td><strong>SQLAlchemy + Alembic</strong></td><td>Python zamiast SQL; Alembic wersjonuje zmiany w bazie</td></tr>
+      <tr><td>Frontend</td><td><strong>Next.js (React + TS)</strong></td><td>To, co już ogarniam</td></tr>
+      <tr><td>Wykresy</td><td><strong>Lightweight Charts</strong></td><td>Świecowe wykresy jak w prawdziwej apce giełdowej (TradingView)</td></tr>
+      <tr><td>Auth</td><td><strong>własne JWT</strong></td><td>Napiszę sam, żeby zrozumieć jak działa logowanie</td></tr>
+      <tr><td>Konteneryzacja</td><td><strong>Docker + docker-compose</strong></td><td>„U mnie działa" → „działa wszędzie"</td></tr>
+      <tr><td>Hosting backend</td><td><strong>Railway</strong> / Fly.io</td><td>Darmowy tier, deploy z gita, ogarnia Dockera</td></tr>
+      <tr><td>Hosting bazy</td><td><strong>Neon</strong> / Supabase</td><td>Darmowy Postgres w chmurze</td></tr>
+      <tr><td>Hosting frontend</td><td><strong>Vercel</strong></td><td>Deploy = <code>git push</code>, darmowy</td></tr>
+      <tr><td>CI/CD</td><td><strong>GitHub Actions</strong></td><td>Commit → testy → auto-deploy</td></tr>
+      <tr><td>Monitoring</td><td><strong>Sentry</strong> + logi hostingu</td><td>Widzę crashe na produkcji</td></tr>
+      <tr><td>Testy</td><td><strong>pytest</strong></td><td>Odróżnia juniora od „piszę i się modlę"</td></tr>
+      <tr><td>Sekrety</td><td><strong>zmienne środowiskowe (.env)</strong></td><td>Klucze API nigdy w kodzie</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="cost">💸 <b>Koszt: 0 zł</b> na start, przez długi czas. Opcjonalnie własna domena ~40 zł/rok — tylko dla efektu „wow".</div>
+
+  <h3 style="margin-top:26px">Jak to się łączy w jeden organizm</h3>
+  <pre>[Ja: git push]
+      │
+      ▼
+[GitHub] ──► [GitHub Actions: testy pytest] ──► deploy
+      │                                          │
+      ▼                                          ▼
+[Vercel: Next.js]  ◄──── HTTP/JSON ────►  [Railway: FastAPI]
+   dashboard,                               │  pandas liczy zwroty
+   wykresy                                  ▼
+                                    [Neon: PostgreSQL]
+                                       portfel, historia
+                              [yfinance ──► pobiera kursy]
+                              [Sentry ──► łapie błędy]</pre>
+
+  <h2><span class="emoji">🪜</span>Plan warstwa po warstwie</h2>
+  <p style="color:var(--muted);font-size:.92rem">Kliknij warstwę, żeby rozwinąć. Odhaczaj zadania — postęp zapisuje się w przeglądarce.</p>
+
+  <div id="layers"></div>
+
+  <div class="status-here">
+    <span class="dot"></span>
+    <div><b>Gdzie teraz jestem:</b> START warstwy 1 — od pustego folderu do pierwszej policzonej liczby na ekranie.</div>
+  </div>
+
+  <h2><span class="emoji">🧪</span>Dokładane po drodze (nie osobne warstwy)</h2>
+  <ul>
+    <li><b>Testy (pytest)</b> — dokładam od warstwy 2, rosną z projektem</li>
+    <li><b>Git / commity</b> — od warstwy 1, dobra higiena od początku</li>
+    <li><b>README</b> — aktualizowane co warstwę, to też portfolio</li>
+  </ul>
+
+  <button class="reset-btn" onclick="resetProgress()">↺ Zresetuj postęp</button>
+
+  <footer>Plik żywy — odhaczaj zadania w miarę postępu. Postęp zapisany lokalnie w przeglądarce.</footer>
+</div>
+
+<script>
+const LAYERS = [
+  {n:1,t:"Rdzeń lokalnie (brzydko, ale działa)",m:"Pierwszy kontakt z prawdziwymi danymi",
+   tasks:["Pusty folder, wirtualne środowisko Pythona","Instalacja yfinance, pandas","Skrypt: pobierz kurs 1 spółki, policz zwrot, wypisz w terminalu"],
+   zaskok:"„Pobrałem prawdziwe dane giełdowe i coś z nich policzyłem.”",
+   teoria:"czym jest zwrot (return), środowisko wirtualne, pip"},
+  {n:2,t:"Backend porządnie (FastAPI)",m:"Własne API",
+   tasks:["FastAPI, pierwszy endpoint GET /health","Endpoint GET /stock/{ticker} → kurs + zwrot jako JSON","Walidacja wejścia (Pydantic)","Automatyczna dokumentacja API (/docs)"],
+   zaskok:"„Mam własne API, które ktoś mógłby odpytać.”",
+   teoria:"czym jest REST API, request/response, JSON, kody HTTP"},
+  {n:3,t:"Baza danych (PostgreSQL)",m:"Dane przeżywają restart",
+   tasks:["Lokalny Postgres (Docker albo instalacja)","Modele: użytkownik, portfel, pozycja","SQLAlchemy — zapis i odczyt","Alembic — pierwsza migracja"],
+   zaskok:"„Dane przeżywają restart aplikacji.”",
+   teoria:"relacyjna baza, tabele, klucze, migracje, po co ORM"},
+  {n:4,t:"Frontend / dashboard",m:"Pierwszy duży efekt „wow”",
+   tasks:["Next.js gada z moim API","Widok portfela: lista pozycji + wartości","Wykres kursu (Lightweight Charts)"],
+   zaskok:"„To wygląda jak prawdziwa apka giełdowa.” ← pierwszy duży efekt",
+   teoria:"fetch do API, CORS, komponenty (dużo już umiem)"},
+  {n:5,t:"Auth + sekrety",m:"Prawdziwe logowanie",
+   tasks:["Rejestracja / logowanie","JWT — token po zalogowaniu","Każdy widzi tylko swój portfel","Klucze i hasła w zmiennych środowiskowych"],
+   zaskok:"„Mam prawdziwe logowanie, które sam napisałem.”",
+   teoria:"hashowanie haseł, tokeny, po co sekrety poza kodem"},
+  {n:6,t:"Quant (serce projektu)",m:"Realny wgląd inwestycyjny",
+   tasks:["Metryki ryzyka (zmienność, max drawdown)","Korelacje między spółkami","Prosty backtest: „gdybym kupił X rok temu…”","Porównanie „ja vs rynek” (np. vs S&P 500)"],
+   zaskok:"„Moja apka daje realny wgląd inwestycyjny.”",
+   teoria:"statystyka finansowa, zmienność, drawdown, benchmark"},
+  {n:7,t:"Konteneryzacja (Docker)",m:"„Działa wszędzie”",
+   tasks:["Dockerfile dla backendu","docker-compose: backend + baza jednym poleceniem"],
+   zaskok:"„docker compose up i całość wstaje od zera.”",
+   teoria:"czym jest kontener, obraz, po co to w ogóle"},
+  {n:8,t:"Chmura (deploy)",m:"Realny adres w sieci",
+   tasks:["Backend na Railway","Baza na Neon","Frontend na Vercel","Wszystko połączone, działa pod realnym URL"],
+   zaskok:"„Wysyłam komuś link i on TO widzi.”",
+   teoria:"produkcja vs lokalne, zmienne środowiskowe w chmurze"},
+  {n:9,t:"CI/CD (GitHub Actions)",m:"Deploy dzieje się sam",
+   tasks:["Pipeline: push → uruchom testy → jeśli zielone, wdróż"],
+   zaskok:"„Nie dotykam serwera, wszystko dzieje się samo po commicie.”",
+   teoria:"czym jest CI/CD, pipeline, dlaczego automatyzacja"},
+  {n:10,t:"Monitoring + logi",m:"Wiem o crashu pierwszy",
+   tasks:["Sentry łapie błędy z produkcji","Przeglądanie logów hostingu"],
+   zaskok:"„Wiem o crashu, zanim ktokolwiek mi go zgłosi.”",
+   teoria:"obserwowalność, logi vs metryki vs błędy"},
+  {n:11,t:"Security-hardening (ethical-hacking)",m:"Patrzę na swój kod oczami atakującego",
+   tasks:["Przegląd apki pod kątem podatności (OWASP Top 10)","Rate limiting, walidacja, zabezpieczenie endpointów","Próba „zhakowania” siebie"],
+   zaskok:"„Patrzę na swój kod oczami atakującego.”",
+   teoria:"OWASP Top 10, typowe podatności, myślenie ofensywne"},
+];
+
+const KEY="portfel-plan-progress";
+let done = JSON.parse(localStorage.getItem(KEY) || "{}");
+
+function idFor(l,i){return "L"+l.n+"_"+i}
+
+function render(){
+  const c=document.getElementById("layers");
+  c.innerHTML="";
+  LAYERS.forEach(l=>{
+    const open = l.n===1 ? " open":"";
+    const div=document.createElement("div");
+    div.className="layer"+open;
+    let tasksHtml=l.tasks.map((t,i)=>{
+      const id=idFor(l,i); const ck=done[id]?"checked":"";
+      return `<li><input type="checkbox" id="${id}" ${ck} onchange="toggle('${id}')"><label for="${id}">${t}</label></li>`;
+    }).join("");
+    div.innerHTML=`
+      <div class="layer-head" onclick="this.parentNode.classList.toggle('open')">
+        <div class="layer-num">${l.n}</div>
+        <div><div class="layer-title">${l.t}</div><div class="layer-meta">${l.m}</div></div>
+        <div class="chevron" style="margin-left:auto">▶</div>
+      </div>
+      <div class="layer-body">
+        <ul class="tasks">${tasksHtml}</ul>
+        <div class="note zaskok">✨ <b>Zaskok:</b> ${l.zaskok}</div>
+        <div class="note teoria">📘 <b>Teoria po drodze:</b> ${l.teoria}</div>
+      </div>`;
+    c.appendChild(div);
+  });
+  updateProgress();
+}
+function toggle(id){ done[id]=document.getElementById(id).checked; localStorage.setItem(KEY,JSON.stringify(done)); updateProgress(); }
+function updateProgress(){
+  let total=0,d=0;
+  LAYERS.forEach(l=>l.tasks.forEach((_,i)=>{total++; if(done[idFor(l,i)])d++;}));
+  const pct= total? Math.round(d/total*100):0;
+  document.getElementById("pfill").style.width=pct+"%";
+  document.getElementById("pcount").textContent=d;
+  document.getElementById("ptotal").textContent=total;
+  document.getElementById("ppct").textContent=pct+"%";
+}
+function resetProgress(){ done={}; localStorage.removeItem(KEY); render(); }
+render();
+</script>
+</body>
+</html>

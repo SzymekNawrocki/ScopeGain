@@ -1,0 +1,13 @@
+# Wirtualne srodowisko - kazdy odtwarza je sobie sam
+.venv/
+
+# Cache Pythona
+__pycache__/
+*.pyc
+
+# Sekrety - klucze i hasla NIGDY do repo
+.env
+
+# Smieci systemowe
+.DS_Store
+Thumbs.db
