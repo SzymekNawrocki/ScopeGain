@@ -4,16 +4,13 @@ from fastapi import APIRouter, HTTPException
 import pandas as pd
 import yfinance as yf
 
-from market import close_series
+from market import BENCHMARK, close_series
 from quant import (
     annualized_volatility_pct,
     daily_returns,
     max_drawdown_pct,
     total_return_pct,
 )
-
-# S&P 500 przez ETF SPY - nasz "rynek", do ktorego porownujemy spolke.
-BENCHMARK = "SPY"
 
 # APIRouter = "mini-aplikacja" z wlasnymi trasami. Endpointy pisze sie na
 # router, a nie na app. tags=[...] grupuje te trasy w /docs pod naglowkiem.

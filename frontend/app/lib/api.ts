@@ -68,6 +68,38 @@ export async function getPortfolioValuation(
   return res.json();
 }
 
+// --- Backtest portfela w czasie: "ja vs rynek" (warstwa 6c) ---
+// Jeden punkt = jeden dzien. Obie liczby to INDEKS od 100 na starcie okresu,
+// wiec portfel i rynek da sie porownac na jednej skali niezaleznie od kwot.
+export type PerformancePoint = {
+  time: string; // "YYYY-MM-DD"
+  portfolio: number;
+  benchmark: number;
+};
+
+export type PortfolioPerformance = {
+  id: number;
+  name: string;
+  period: string;
+  benchmark_ticker: string;
+  portfolio_return_pct: number;
+  benchmark_return_pct: number;
+  alpha_pct: number; // nadwyzka portfela nad rynkiem (dodatnia = bijesz rynek)
+  series: PerformancePoint[];
+};
+
+// Pobiera krzywa wzrostu portfela vs rynek za dany zakres.
+export async function getPortfolioPerformance(
+  id: number,
+  period: Period = "6mo",
+): Promise<PortfolioPerformance> {
+  const res = await fetch(`${API_BASE}/portfolios/${id}/performance?period=${period}`);
+  if (!res.ok) {
+    throw new Error(`API zwrocilo ${res.status}`);
+  }
+  return res.json();
+}
+
 // --- Historia kursu (swiece OHLC) do wykresu ---
 
 // Jedna swieca. Ksztalt 1:1 z tym, czego oczekuje Lightweight Charts.

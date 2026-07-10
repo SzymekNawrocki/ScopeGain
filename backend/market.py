@@ -8,6 +8,9 @@ dostawce danych, ruszamy tylko ten plik. To tez ulatwia testy (mozna podmienic).
 import pandas as pd
 import yfinance as yf
 
+# S&P 500 przez ETF SPY - nasz "rynek", do ktorego porownujemy wyniki.
+BENCHMARK = "SPY"
+
 
 def latest_prices(tickers: list[str]) -> dict[str, float]:
     """Ostatnia znana cena zamkniecia dla kazdej spolki.
@@ -55,4 +58,28 @@ def close_series(ticker: str, period: str = "6mo") -> pd.Series:
     # Przy jednej spolce "Close" bywa DataFrame z jedna kolumna - bierzemy ja.
     if isinstance(close, pd.DataFrame):
         close = close.iloc[:, 0]
+    return close.dropna()
+
+
+def closes_frame(tickers: list[str], period: str = "6mo") -> pd.DataFrame:
+    """Tabela cen zamkniecia WIELU spolek, WYROWNANA po datach.
+
+    Kolumny = tickery, wiersze = dni. dropna() zostawia tylko dni, w ktore
+    notowaly sie WSZYSTKIE spolki - dzieki temu mozna je sumowac dzien po dniu
+    (do wartosci portfela) bez dziur. Pusta tabela = brak danych.
+    """
+    unikalne = sorted({t.upper() for t in tickers})
+    if not unikalne:
+        return pd.DataFrame()
+
+    dane = yf.download(
+        unikalne, period=period, interval="1d", progress=False, auto_adjust=True
+    )
+    if dane.empty:
+        return pd.DataFrame()
+
+    close = dane["Close"]
+    if isinstance(close, pd.Series):
+        close = close.to_frame(name=unikalne[0])
+    close.columns = [str(c).upper() for c in close.columns]
     return close.dropna()

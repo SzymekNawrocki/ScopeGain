@@ -1,10 +1,14 @@
+from typing import Literal
+
+import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from database import get_db
-from market import latest_prices
+from market import BENCHMARK, close_series, closes_frame, latest_prices
 from models import Portfolio, Position
+from quant import total_return_pct
 from schemas import (
     PortfolioCreate,
     PortfolioRead,
@@ -99,6 +103,66 @@ def portfolio_valuation(portfolio_id: int, db: Session = Depends(get_db)):
         total_pnl_abs=round(zysk_total, 2),
         total_pnl_pct=round(zysk_total_pct, 2),
     )
+
+
+# Backtest portfela w czasie: "ja vs rynek". Liczy wartosc portfela dzien po
+# dniu (suma ilosc*cena kazdej spolki) i normalizuje do 100 na starcie, tak
+# samo benchmark (SPY). Dwie krzywe od 100 - widac, kto rosnie szybciej.
+@router.get("/{portfolio_id}/performance")
+def portfolio_performance(
+    portfolio_id: int,
+    period: Literal["1mo", "3mo", "6mo", "1y", "5y"] = "6mo",
+    db: Session = Depends(get_db),
+):
+    portfel = db.get(Portfolio, portfolio_id)
+    if portfel is None:
+        raise HTTPException(status_code=404, detail=f"Nie ma portfela o id {portfolio_id}.")
+    if not portfel.positions:
+        raise HTTPException(status_code=400, detail="Portfel jest pusty - nie ma co liczyc.")
+
+    # Wyrownane ceny wszystkich spolek z portfela (wspolne dni notowan).
+    ceny = closes_frame([p.ticker for p in portfel.positions], period)
+    if ceny.empty:
+        raise HTTPException(status_code=404, detail="Brak danych rynkowych dla tego portfela.")
+
+    # Wartosc portfela w kazdym dniu = suma (ilosc * cena) po pozycjach.
+    wartosc = pd.Series(0.0, index=ceny.index)
+    for p in portfel.positions:
+        kol = p.ticker.upper()
+        if kol in ceny.columns:
+            wartosc = wartosc + float(p.quantity) * ceny[kol]
+
+    # Indeks od 100: kazdy punkt to "ile masz, jesli start = 100". Pozwala
+    # porownac portfel i rynek na jednej skali, niezaleznie od kwot.
+    portfel_idx = wartosc / wartosc.iloc[0] * 100
+
+    # Benchmark wyrownany do tych samych dni (ffill zasklepia ew. luki).
+    bench = close_series(BENCHMARK, period)
+    bench = bench.reindex(portfel_idx.index).ffill().bfill()
+    bench_idx = bench / bench.iloc[0] * 100
+
+    seria = [
+        {
+            "time": data.strftime("%Y-%m-%d"),
+            "portfolio": round(float(portfel_idx.loc[data]), 2),
+            "benchmark": round(float(bench_idx.loc[data]), 2),
+        }
+        for data in portfel_idx.index
+    ]
+
+    portfel_zwrot = round(float(portfel_idx.iloc[-1] - 100), 2)
+    bench_zwrot = round(float(bench_idx.iloc[-1] - 100), 2)
+
+    return {
+        "id": portfel.id,
+        "name": portfel.name,
+        "period": period,
+        "benchmark_ticker": BENCHMARK,
+        "portfolio_return_pct": portfel_zwrot,
+        "benchmark_return_pct": bench_zwrot,
+        "alpha_pct": round(portfel_zwrot - bench_zwrot, 2),
+        "series": seria,
+    }
 
 
 @router.post(
