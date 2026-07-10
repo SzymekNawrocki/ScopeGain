@@ -1,4 +1,4 @@
-# Plan projektu — Platforma analizy portfela + backtest
+# Plan projektu — ScopeGain (analiza portfela + backtest)
 
 > **Cel:** zbudować JEDNĄ pełnoprawną aplikację full-stack, na której nauczę się
 > backendu, DevOps, chmury, fintechu i security — warstwa po warstwie, aż każda
@@ -82,31 +82,36 @@ testami i przemyślanymi decyzjami — nie kolejne repo z tutorialem.
 Każda warstwa to osobny „rozdział". Zaczynam kolejny dopiero, gdy poprzedni działa
 i rozumiem, dlaczego działa.
 
-### Warstwa 1 — Rdzeń lokalnie (brzydko, ale działa)
-- [ ] Pusty folder, wirtualne środowisko Pythona
-- [ ] Instalacja `yfinance`, `pandas`
-- [ ] Skrypt: pobierz kurs 1 spółki, policz zwrot, wypisz liczbę w terminalu
+### ✅ Warstwa 1 — Rdzeń lokalnie (brzydko, ale działa) — ZROBIONE
+- [x] Pusty folder, wirtualne środowisko Pythona (`.venv`)
+- [x] Instalacja `yfinance`, `pandas`
+- [x] Skrypt `hello_stock.py`: pobiera kurs AAPL, liczy zwrot, wypisuje liczbę
 - **Zaskok:** „pobrałem prawdziwe dane giełdowe i coś z nich policzyłem"
 - **Teoria po drodze:** czym jest zwrot (return), środowisko wirtualne, pip
 
-### Warstwa 2 — Backend porządnie (FastAPI)
-- [ ] Postawienie FastAPI, pierwszy endpoint `GET /health`
-- [ ] Endpoint `GET /stock/{ticker}` zwracający kurs + zwrot jako JSON
-- [ ] Walidacja danych wejściowych (Pydantic)
-- [ ] Automatyczna dokumentacja API (`/docs`)
+### ✅ Warstwa 2 — Backend porządnie (FastAPI) — ZROBIONE
+- [x] Postawienie FastAPI, pierwszy endpoint `GET /health`
+- [x] Endpoint `GET /stock/{ticker}` zwracający kurs + zwrot jako JSON
+- [x] Obsługa błędów: nieistniejąca spółka → 404 (nie 500)
+- [ ] Walidacja treści (Pydantic) — przeniesiona do warstwy 4a (endpointy `POST`)
+- [x] Automatyczna dokumentacja API (`/docs`)
 - **Zaskok:** „mam własne API, które ktoś mógłby odpytać"
 - **Teoria:** czym jest REST API, request/response, JSON, kody HTTP
 
-### Warstwa 3 — Baza danych (PostgreSQL)
-- [ ] Lokalny Postgres (przez Docker albo instalacja)
-- [ ] Modele: użytkownik, portfel, pozycja (spółka + ilość)
-- [ ] SQLAlchemy — zapis i odczyt z bazy
-- [ ] Alembic — pierwsza migracja
-- **Zaskok:** „dane przeżywają restart aplikacji"
+### ✅ Warstwa 3 — Baza danych (PostgreSQL) — ZROBIONE
+- [x] Lokalny Postgres 16 przez Docker (kontener `scopegain-db`, port 5432)
+- [x] Modele: portfel ——< pozycja (klucz obcy). Użytkownik → warstwa 5 (auth)
+- [x] SQLAlchemy — zapis i odczyt z bazy (`database.py`, `models.py`)
+- [x] Alembic — pierwsza migracja (tabele `portfolios`, `positions`)
+- **Zaskok:** „dane przeżywają restart aplikacji" (zweryfikowane — restart kontenera)
 - **Teoria:** relacyjna baza, tabele, klucze, migracje, po co ORM
 
-### Warstwa 4 — Frontend / dashboard
-- [ ] Next.js gada z moim API
+> **Decyzja:** SQLite odrzucone — uczymy się „na poważnie" od razu na Postgresie.
+> Docker podprowadzony z warstwy 7 (tylko `docker run`), żeby postawić bazę czysto.
+
+### Warstwa 4 — Frontend / dashboard  ← TU JESTEM
+- [ ] **4a.** Endpointy portfela w API: `POST /portfolios`, `GET /portfolios` (+ Pydantic!)
+- [ ] **4b.** Next.js gada z moim API
 - [ ] Widok portfela: lista pozycji + wartości
 - [ ] Wykres kursu (Lightweight Charts)
 - **Zaskok:** „to wygląda jak prawdziwa apka giełdowa" ← pierwszy duży efekt „wow"
@@ -170,6 +175,14 @@ i rozumiem, dlaczego działa.
 ---
 
 ## 📌 Gdzie teraz jestem
-- [ ] **Warstwa 1** ← START tutaj
+- [x] **Warstwa 1** — Rdzeń lokalnie ✅
+- [x] **Warstwa 2** — Backend FastAPI ✅
+- [x] **Warstwa 3** — Baza Postgres + Alembic ✅
+- [ ] **Warstwa 4** — Frontend / dashboard ← **START tutaj** (najpierw 4a: endpointy portfela)
+
+**Repo:** https://github.com/SzymekNawrocki/ScopeGain
+**Odpalenie lokalnie:**
+- baza: `docker start scopegain-db`
+- API: `.venv\Scripts\python.exe -m uvicorn main:app --reload` → http://127.0.0.1:8000/docs
 
 _Plik żywy — odhaczam zadania i aktualizuję w miarę postępu._
