@@ -109,13 +109,14 @@ i rozumiem, dlaczego działa.
 > **Decyzja:** SQLite odrzucone — uczymy się „na poważnie" od razu na Postgresie.
 > Docker podprowadzony z warstwy 7 (tylko `docker run`), żeby postawić bazę czysto.
 
-### Warstwa 4 — Frontend / dashboard  ← TU JESTEM
+### ✅ Warstwa 4 — Frontend / dashboard — ZROBIONE
 - [x] **4a.** Endpointy portfela w API: `POST /portfolios`, `GET /portfolios` (+ Pydantic!)
 - [x] **4b.** Next.js gada z moim API (fetch z przeglądarki + CORS na backendzie)
 - [x] Widok portfela: lista pozycji + koszt wejścia (design cyberpunk wg DESIGN.md)
-- [ ] Wykres kursu (Lightweight Charts)
+- [x] **4c.** Wykres kursu (Lightweight Charts): endpoint `GET /stock/{ticker}/history`
+      (świece OHLC) + komponent `PriceChart` + sekcja `MarketScope` (ticker + zakres)
 - **Zaskok:** „to wygląda jak prawdziwa apka giełdowa" ← pierwszy duży efekt „wow" ✅
-- **Teoria:** fetch do API, CORS, komponenty (dużo już umiem)
+- **Teoria:** fetch do API, CORS, komponenty, `useRef` do integracji z biblioteką spoza Reacta
 
 ### Warstwa 5 — Auth + sekrety
 - [ ] Rejestracja / logowanie
@@ -178,7 +179,8 @@ i rozumiem, dlaczego działa.
 - [x] **Warstwa 1** — Rdzeń lokalnie ✅
 - [x] **Warstwa 2** — Backend FastAPI ✅
 - [x] **Warstwa 3** — Baza Postgres + Alembic ✅
-- [ ] **Warstwa 4** — Frontend / dashboard ← **START tutaj** (najpierw 4a: endpointy portfela)
+- [x] **Warstwa 4** — Frontend / dashboard (portfele + wykres świecowy) ✅
+- [ ] **Warstwa 5** — Auth + sekrety ← **START tutaj** (rejestracja/logowanie, JWT)
 
 **Repo:** https://github.com/SzymekNawrocki/ScopeGain
 **Układ:** monorepo — `backend/` (FastAPI) + `frontend/` (Next.js)

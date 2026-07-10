@@ -1,4 +1,7 @@
+from typing import Literal
+
 from fastapi import APIRouter, HTTPException
+import pandas as pd
 import yfinance as yf
 
 # APIRouter = "mini-aplikacja" z wlasnymi trasami. Endpointy pisze sie na
@@ -32,3 +35,42 @@ def stock_return(ticker: str):
         "end_price": round(cena_koncowa, 2),
         "return_pct": round(zwrot * 100, 2),
     }
+
+
+# Historia swiec (OHLC) do wykresu. Lightweight Charts na froncie oczekuje
+# listy obiektow { time, open, high, low, close } - dokladnie to tu budujemy.
+# period: Literal = FastAPI sam odrzuci zla wartosc (422), zanim wejdziemy w kod.
+@router.get("/stock/{ticker}/history")
+def stock_history(
+    ticker: str,
+    period: Literal["1mo", "3mo", "6mo", "1y", "5y"] = "6mo",
+):
+    dane = yf.download(
+        ticker, period=period, interval="1d", progress=False, auto_adjust=True
+    )
+
+    if dane.empty:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Nie znaleziono spolki '{ticker}'. Sprawdz symbol.",
+        )
+
+    # Przy JEDNEJ spolce yfinance oddaje "pietrowe" kolumny (MultiIndex):
+    # ('Close', 'AAPL'). Splaszczamy do zwyklego 'Close', 'Open', ...,
+    # zeby moc czytac wiersz po wierszu.
+    if isinstance(dane.columns, pd.MultiIndex):
+        dane.columns = dane.columns.get_level_values(0)
+
+    # Kazdy wiersz tabeli -> jedna swieca. Index wiersza to data sesji.
+    swiece = [
+        {
+            "time": data.strftime("%Y-%m-%d"),
+            "open": round(float(wiersz["Open"]), 2),
+            "high": round(float(wiersz["High"]), 2),
+            "low": round(float(wiersz["Low"]), 2),
+            "close": round(float(wiersz["Close"]), 2),
+        }
+        for data, wiersz in dane.iterrows()
+    ]
+
+    return {"ticker": ticker.upper(), "period": period, "candles": swiece}

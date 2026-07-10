@@ -31,3 +31,41 @@ export async function getPortfolios(): Promise<Portfolio[]> {
 export function costBasis(p: Portfolio): number {
   return p.positions.reduce((sum, pos) => sum + pos.quantity * pos.buy_price, 0);
 }
+
+// --- Historia kursu (swiece OHLC) do wykresu ---
+
+// Jedna swieca. Ksztalt 1:1 z tym, czego oczekuje Lightweight Charts.
+export type Candle = {
+  time: string; // "YYYY-MM-DD"
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+};
+
+export type StockHistory = {
+  ticker: string;
+  period: string;
+  candles: Candle[];
+};
+
+// Dozwolone zakresy - te same, co Literal w backendzie (/stock/{t}/history).
+export const PERIODS = ["1mo", "3mo", "6mo", "1y", "5y"] as const;
+export type Period = (typeof PERIODS)[number];
+
+// Pobiera historie swiec dla spolki. 404 = zly ticker -> czytelny komunikat.
+export async function getStockHistory(
+  ticker: string,
+  period: Period = "6mo",
+): Promise<StockHistory> {
+  const res = await fetch(
+    `${API_BASE}/stock/${encodeURIComponent(ticker)}/history?period=${period}`,
+  );
+  if (!res.ok) {
+    if (res.status === 404) {
+      throw new Error(`Nie znaleziono spolki "${ticker.toUpperCase()}"`);
+    }
+    throw new Error(`API zwrocilo ${res.status}`);
+  }
+  return res.json();
+}

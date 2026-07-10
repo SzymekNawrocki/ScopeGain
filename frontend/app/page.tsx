@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getPortfolios, Portfolio } from "./lib/api";
 import { PortfolioCard } from "./components/PortfolioCard";
+import { MarketScope } from "./components/MarketScope";
 
 export default function Dashboard() {
   // Trzy stany zycia danych: ladowanie -> (sukces | blad).
@@ -32,6 +33,14 @@ export default function Dashboard() {
           <span className="cursor-blink" />
         </p>
       </header>
+
+      {/* WYKRES KURSU - swiece z /stock/{ticker}/history */}
+      <MarketScope />
+
+      {/* PORTFELE */}
+      <p className="mb-4 font-mono text-xs uppercase tracking-[0.3em] text-accent-tertiary">
+        <span className="text-accent">$</span> ./portfolios --list
+      </p>
 
       {/* STANY */}
       {error ? (
