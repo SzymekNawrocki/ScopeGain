@@ -17,6 +17,22 @@ const pnlColor = (n: number | null | undefined) =>
   n == null ? "text-foreground" : n >= 0 ? "text-accent" : "text-destructive";
 const withSign = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(2)}`;
 
+// Slowna ocena Sharpe'a wg reguly kciuka + kolor.
+function sharpeVerdict(s: number): { label: string; color: string } {
+  if (s < 0.5) return { label: "slaby", color: "text-destructive" };
+  if (s < 1) return { label: "przecietny", color: "text-foreground" };
+  if (s < 2) return { label: "dobry", color: "text-accent" };
+  return { label: "swietny", color: "text-accent" };
+}
+
+// Beta -> co to znaczy po ludzku (nie jest 'dobra' ani 'zla' sama w sobie).
+function betaVerdict(b: number): string {
+  if (b < 0) return "odwrotnie do rynku";
+  if (b < 0.9) return "spokojniej niz rynek";
+  if (b <= 1.1) return "jak rynek";
+  return "mocniej niz rynek";
+}
+
 // Sekcja "portfel vs rynek": wybor portfela + zakresu, krzywa wzrostu i alpha.
 export function PortfolioVsMarket({ portfolios }: { portfolios: Portfolio[] }) {
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -141,6 +157,9 @@ export function PortfolioVsMarket({ portfolios }: { portfolios: Portfolio[] }) {
             </div>
           )}
 
+          {/* Panel ryzyko/nagroda - twarde metryki, ktorych broker nie daje */}
+          {perf && <RiskPanel risk={perf.risk} />}
+
           {/* Stany */}
           {error ? (
             <div className="cyber-chamfer border-2 border-destructive bg-card p-6 font-mono text-sm text-destructive">
@@ -173,5 +192,56 @@ export function PortfolioVsMarket({ portfolios }: { portfolios: Portfolio[] }) {
         </div>
       </div>
     </section>
+  );
+}
+
+// Panel metryk ryzyko/nagroda: Sharpe + beta + zwrot/ryzyko.
+function RiskPanel({ risk }: { risk: import("../lib/api").PortfolioRisk }) {
+  const s = sharpeVerdict(risk.sharpe);
+  return (
+    <div className="mb-4">
+      <p className="mb-2 font-mono text-[0.6rem] uppercase tracking-[0.2em] text-muted-foreground">
+        Ryzyko / nagroda — czego broker Ci nie pokaze
+      </p>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+        <RiskTile label="Sharpe" value={risk.sharpe.toFixed(2)} hint={s.label} className={s.color} />
+        <RiskTile
+          label="Beta (vs rynek)"
+          value={risk.beta.toFixed(2)}
+          hint={betaVerdict(risk.beta)}
+          className="text-accent-tertiary"
+        />
+        <RiskTile
+          label="Zwrot / ryzyko"
+          value={risk.return_risk.toFixed(2)}
+          hint={`zmiennosc ${risk.volatility_pct.toFixed(1)}%`}
+          className={pnlColor(risk.return_risk)}
+        />
+      </div>
+    </div>
+  );
+}
+
+function RiskTile({
+  label,
+  value,
+  hint,
+  className,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+  className?: string;
+}) {
+  return (
+    <div className="cyber-chamfer-sm border border-border bg-[#12121a] px-4 py-3">
+      <p className="font-mono text-[0.6rem] uppercase tracking-[0.2em] text-muted-foreground">
+        {label}
+      </p>
+      <p className={`mt-1 font-display text-xl font-bold ${className ?? "text-foreground"}`}>
+        {value}
+      </p>
+      <p className="mt-0.5 font-mono text-[0.6rem] text-muted-foreground">{hint}</p>
+    </div>
   );
 }

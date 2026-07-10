@@ -8,7 +8,13 @@ from sqlalchemy.orm import Session
 from database import get_db
 from market import BENCHMARK, close_series, closes_frame, latest_prices
 from models import Portfolio, Position
-from quant import returns_frame, total_return_pct
+from quant import (
+    annualized_volatility_pct,
+    beta,
+    returns_frame,
+    sharpe_ratio,
+    total_return_pct,
+)
 from schemas import (
     PortfolioCreate,
     PortfolioRead,
@@ -153,6 +159,20 @@ def portfolio_performance(
     portfel_zwrot = round(float(portfel_idx.iloc[-1] - 100), 2)
     bench_zwrot = round(float(bench_idx.iloc[-1] - 100), 2)
 
+    # Metryki ryzyko/nagroda liczymy z dziennych zwrotow serii (indeks od 100
+    # ma te same zwroty co realna wartosc - normalizacja nic tu nie psuje).
+    port_zwroty = portfel_idx.pct_change().dropna()
+    bench_zwroty = bench_idx.pct_change().dropna()
+    zmiennosc = annualized_volatility_pct(port_zwroty)
+
+    ryzyko = {
+        "sharpe": round(sharpe_ratio(port_zwroty), 2),
+        "beta": round(beta(port_zwroty, bench_zwroty), 2),
+        "volatility_pct": round(zmiennosc, 2),
+        # zwrot na jednostke ryzyka - proste, intuicyjne uzupelnienie Sharpe'a
+        "return_risk": round(portfel_zwrot / zmiennosc, 2) if zmiennosc else 0.0,
+    }
+
     return {
         "id": portfel.id,
         "name": portfel.name,
@@ -161,6 +181,7 @@ def portfolio_performance(
         "portfolio_return_pct": portfel_zwrot,
         "benchmark_return_pct": bench_zwrot,
         "alpha_pct": round(portfel_zwrot - bench_zwrot, 2),
+        "risk": ryzyko,
         "series": seria,
     }
 

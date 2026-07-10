@@ -77,6 +77,16 @@ export type PerformancePoint = {
   benchmark: number;
 };
 
+// Metryki ryzyko/nagroda calego portfela (twarde liczby, ktorych broker
+// nie pokazuje). Sharpe = zwrot na jednostke ryzyka; beta = jak mocno
+// portfel rusza sie razem z rynkiem.
+export type PortfolioRisk = {
+  sharpe: number;
+  beta: number;
+  volatility_pct: number;
+  return_risk: number;
+};
+
 export type PortfolioPerformance = {
   id: number;
   name: string;
@@ -85,6 +95,7 @@ export type PortfolioPerformance = {
   portfolio_return_pct: number;
   benchmark_return_pct: number;
   alpha_pct: number; // nadwyzka portfela nad rynkiem (dodatnia = bijesz rynek)
+  risk: PortfolioRisk;
   series: PerformancePoint[];
 };
 

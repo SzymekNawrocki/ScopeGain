@@ -48,6 +48,38 @@ def annualized_volatility_pct(returns: pd.Series) -> float:
     return float(returns.std() * np.sqrt(TRADING_DAYS) * 100)
 
 
+def sharpe_ratio(returns: pd.Series, risk_free_annual: float = 0.0) -> float:
+    """Sharpe: ile zwrotu dostajesz NA JEDNOSTKE ryzyka (zroczniony).
+
+    (sredni dzienny zwrot - stopa wolna od ryzyka) / odchylenie std, razy
+    sqrt(252). Wysoki = zysk 'zdrowy'; niski = duzo bujania za maly zwrot.
+    risk_free = 0 to uproszczenie MVP (realnie ~bony skarbowe).
+    Regula kciuka: <1 slaby, 1-2 dobry, >2 swietny.
+    """
+    std = returns.std()
+    if std == 0 or returns.empty:
+        return 0.0
+    rf_dzienna = risk_free_annual / TRADING_DAYS
+    return float((returns.mean() - rf_dzienna) / std * np.sqrt(TRADING_DAYS))
+
+
+def beta(asset_returns: pd.Series, market_returns: pd.Series) -> float:
+    """Beta: jak mocno ruszasz sie RAZEM z rynkiem.
+
+    kowariancja(portfel, rynek) / wariancja(rynku). 1 = jak rynek,
+    >1 = mocniej (agresywniej), <1 = spokojniej, <0 = odwrotnie do rynku.
+    Serie wyrownujemy po datach (dropna), bo licza sie tylko wspolne dni.
+    """
+    df = pd.concat([asset_returns, market_returns], axis=1).dropna()
+    if len(df) < 2:
+        return 0.0
+    portfel, rynek = df.iloc[:, 0], df.iloc[:, 1]
+    war_rynku = rynek.var()
+    if war_rynku == 0:
+        return 0.0
+    return float(portfel.cov(rynek) / war_rynku)
+
+
 def max_drawdown_pct(close: pd.Series) -> float:
     """Najwieksze obsuniecie od szczytu do pozniejszego dolka (liczba ujemna).
 
