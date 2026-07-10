@@ -1,5 +1,11 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 import yfinance as yf
+
+from database import get_db
+from models import Portfolio
+from schemas import PortfolioCreate, PortfolioRead
 
 app = FastAPI(title="ScopeGain API")
 
@@ -35,3 +41,26 @@ def stock_return(ticker: str):
         "end_price": round(cena_koncowa, 2),
         "return_pct": round(zwrot * 100, 2),
     }
+
+
+# ------------------------------------------------------------------------
+# PORTFELE (warstwa 4a)
+# response_model = schemat, ktorym FastAPI FILTRUJE odpowiedz. Nawet gdy
+# obiekt z bazy ma wiecej pol, klient dostanie tylko to, co w schemacie.
+# ------------------------------------------------------------------------
+
+
+@app.post("/portfolios", response_model=PortfolioRead, status_code=201)
+def create_portfolio(dane: PortfolioCreate, db: Session = Depends(get_db)):
+    # dane sa juz zwalidowane przez Pydantic (bramkarz). Tworzymy wiersz w bazie.
+    portfel = Portfolio(name=dane.name)
+    db.add(portfel)       # "dopisz do sesji"
+    db.commit()           # "zatwierdz w bazie" (dopiero teraz trafia na dysk)
+    db.refresh(portfel)   # dociagnij id, ktore nadala baza
+    return portfel
+
+
+@app.get("/portfolios", response_model=list[PortfolioRead])
+def list_portfolios(db: Session = Depends(get_db)):
+    # select(...) buduje zapytanie; scalars().all() zwraca liste obiektow.
+    return db.scalars(select(Portfolio)).all()

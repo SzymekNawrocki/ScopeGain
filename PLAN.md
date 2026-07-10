@@ -110,7 +110,7 @@ i rozumiem, dlaczego działa.
 > Docker podprowadzony z warstwy 7 (tylko `docker run`), żeby postawić bazę czysto.
 
 ### Warstwa 4 — Frontend / dashboard  ← TU JESTEM
-- [ ] **4a.** Endpointy portfela w API: `POST /portfolios`, `GET /portfolios` (+ Pydantic!)
+- [x] **4a.** Endpointy portfela w API: `POST /portfolios`, `GET /portfolios` (+ Pydantic!)
 - [ ] **4b.** Next.js gada z moim API
 - [ ] Widok portfela: lista pozycji + wartości
 - [ ] Wykres kursu (Lightweight Charts)
