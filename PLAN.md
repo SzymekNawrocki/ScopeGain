@@ -135,10 +135,25 @@ i rozumiem, dlaczego działa.
       (krzywa portfel vs SPY, obie od 100) → dwuliniowy wykres
 - [x] **6d.** Korelacje między spółkami: `GET /portfolios/{id}/correlations`
       → mapa cieplna (dywersyfikacja)
-- **Kod:** czyste obliczenia w `quant.py` (pandas/numpy), dane rynkowe w
-  `market.py` (yfinance) — oddzielone od API, żeby dało się testować.
-- **Zaskok:** „moja apka daje realny wgląd inwestycyjny" ✅
-- **Teoria:** statystyka finansowa, zmienność, drawdown, benchmark, korelacja
+- [x] **6e.** Metryki ryzyko/nagroda portfela (Sharpe, beta, zwrot/ryzyko)
+      w `GET /portfolios/{id}/performance` → panel kafelków
+- [x] **6f.** WERDYKT: silnik reguł `analysis.py` zamienia liczby w wnioski
+      po ludzku + ocenę 🟢🟡🔴 — `GET /portfolios/{id}/verdict`
+- **Kod:** czyste obliczenia w `quant.py` (pandas/numpy), reguły w `analysis.py`,
+  dane rynkowe w `market.py` (yfinance) — wszystko oddzielone od API (testowalne).
+- **Zaskok:** „moja apka daje realny wgląd inwestycyjny i MÓWI, co z niego wynika" ✅
+- **Teoria:** zmienność, drawdown, benchmark, korelacja, Sharpe, beta, alpha
+
+### ✅ Warstwa UX — z „tablicy do gapienia" w używalne narzędzie — ZROBIONE
+> Wtrącona po warstwie 6, bo analiza liczyła się o seedzie, nie o danych usera.
+- [x] **ux-1.** Zarządzanie danymi z UI: `+ nowy portfel`, dodaj/usuń pozycję,
+      usuń portfel. Walidacja rynkowa przy dodawaniu (`400` na nieznany ticker).
+      Nowe: `DELETE /portfolios/{id}`, `DELETE /portfolios/{id}/positions/{pid}`.
+- [x] **ux-2.** Przyklejony pasek nawigacji + sekcje z kotwicami
+      (Portfele → Rynek → Analiza), płynne przewijanie, puste stany prowadzące.
+- **Zaskok:** „to jest MOJE narzędzie na MOICH danych, nie demo"
+- **Do dopchnięcia później:** edycja pozycji, globalny wybór portfela w pasku,
+  podświetlanie aktywnej sekcji przy scrollu.
 
 ### Warstwa 7 — Konteneryzacja (Docker)
 - [ ] Dockerfile dla backendu
@@ -186,15 +201,26 @@ i rozumiem, dlaczego działa.
 - [x] **Warstwa 2** — Backend FastAPI ✅
 - [x] **Warstwa 3** — Baza Postgres + Alembic ✅
 - [x] **Warstwa 4** — Frontend / dashboard (portfele + wykres świecowy) ✅
-- [x] **Warstwa 6** — Quant: wycena+P&L, ryzyko, backtest vs rynek, korelacje ✅
+- [x] **Warstwa 6** — Quant: wycena+P&L, ryzyko, backtest vs rynek, korelacje, Sharpe/beta, WERDYKT ✅
+- [x] **Warstwa UX** — zarządzanie danymi z UI (CRUD) + nawigacja/układ ✅
 - [ ] **Warstwa 5** — Auth + sekrety (odłożona świadomie — najpierw serce inwestycyjne)
 - [ ] **Warstwy 7–11** — Docker, chmura, CI/CD, monitoring, security (później)
+
+**Backend — moduły (mapa):**
+- `routers/` — HTTP: `stock.py` (kursy, historia świec, metryki), `portfolios.py` (CRUD + wycena, backtest, korelacje, werdykt)
+- `quant.py` — czyste obliczenia (zwroty, zmienność, drawdown, Sharpe, beta)
+- `analysis.py` — silnik reguł werdyktu (liczby → wnioski + ocena)
+- `market.py` — jedyne miejsce z yfinance (ceny, historia, benchmark SPY)
+
+**Do dopchnięcia (używalność):** edycja pozycji, testy pytest (wciąż brak!),
+globalny wybór portfela w pasku. **Analiza — dalej:** „co napędza wynik", „ile netto (Belka)".
 
 **Repo:** https://github.com/SzymekNawrocki/ScopeGain
 **Układ:** monorepo — `backend/` (FastAPI) + `frontend/` (Next.js)
 **Odpalenie lokalnie:**
 - baza: `docker start scopegain-db`
-- API: `cd backend` → `.venv\Scripts\python.exe -m uvicorn main:app --reload` → http://127.0.0.1:8000/docs
+- API: `cd backend` → `.venv\Scripts\python.exe -m uvicorn main:app --port 8000` → http://127.0.0.1:8000/docs
+  (bez `--reload` — na tym Windowsie zostawia osierocone workery na porcie 8000)
 - front: `cd frontend` → `npm run dev` → http://localhost:3000
 
 _Plik żywy — odhaczam zadania i aktualizuję w miarę postępu._
