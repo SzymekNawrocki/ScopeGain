@@ -32,6 +32,42 @@ export function costBasis(p: Portfolio): number {
   return p.positions.reduce((sum, pos) => sum + pos.quantity * pos.buy_price, 0);
 }
 
+// --- Zywa wycena portfela (warstwa 6: quant) ---
+// Ksztalt 1:1 ze schematami PortfolioValuation / PositionValuation w backendzie.
+// "| null" bo cena rynkowa moze byc niedostepna - wtedy wyceny nie liczymy.
+export type PositionValuation = {
+  id: number;
+  ticker: string;
+  quantity: number;
+  buy_price: number;
+  current_price: number | null;
+  cost_basis: number;
+  market_value: number | null;
+  pnl_abs: number | null;
+  pnl_pct: number | null;
+};
+
+export type PortfolioValuation = {
+  id: number;
+  name: string;
+  positions: PositionValuation[];
+  total_cost: number;
+  total_value: number;
+  total_pnl_abs: number;
+  total_pnl_pct: number;
+};
+
+// Dociaga aktualna wycene portfela (ceny z rynku + policzony zysk/strata).
+export async function getPortfolioValuation(
+  id: number,
+): Promise<PortfolioValuation> {
+  const res = await fetch(`${API_BASE}/portfolios/${id}/valuation`);
+  if (!res.ok) {
+    throw new Error(`API zwrocilo ${res.status}`);
+  }
+  return res.json();
+}
+
 // --- Historia kursu (swiece OHLC) do wykresu ---
 
 // Jedna swieca. Ksztalt 1:1 z tym, czego oczekuje Lightweight Charts.

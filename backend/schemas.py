@@ -43,3 +43,29 @@ class PortfolioRead(BaseModel):
     positions: list[PositionRead] = []
 
     model_config = {"from_attributes": True}
+
+
+# --- WYCENA (warstwa 6: quant) ---
+# Te schematy NIE lustrza tabeli - to policzony wynik. Pola "| None" bo cena
+# rynkowa moze byc niedostepna (np. wycofana spolka) - wtedy wyceny nie liczymy.
+
+class PositionValuation(BaseModel):
+    id: int
+    ticker: str
+    quantity: float
+    buy_price: float          # cena zakupu (koszt wejscia na sztuke)
+    current_price: float | None   # ostatnia cena rynkowa
+    cost_basis: float         # ile wydano: ilosc * cena zakupu
+    market_value: float | None    # ile warte dzis: ilosc * cena rynkowa
+    pnl_abs: float | None     # zysk/strata w $ (market_value - cost_basis)
+    pnl_pct: float | None     # zysk/strata w % wzgledem kosztu
+
+
+class PortfolioValuation(BaseModel):
+    id: int
+    name: str
+    positions: list[PositionValuation]
+    total_cost: float         # suma kosztow wejscia (tylko wycenione pozycje)
+    total_value: float        # suma wartosci rynkowej
+    total_pnl_abs: float      # laczny zysk/strata w $
+    total_pnl_pct: float      # laczny zysk/strata w %
