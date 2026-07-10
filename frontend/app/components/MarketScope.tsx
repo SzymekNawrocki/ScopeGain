@@ -3,11 +3,19 @@
 import { FormEvent, useEffect, useState } from "react";
 import {
   getStockHistory,
+  getStockMetrics,
   PERIODS,
   Period,
   StockHistory,
+  StockMetrics,
 } from "../lib/api";
 import { PriceChart } from "./PriceChart";
+
+// Zysk >= 0 -> neon zielony, strata -> czerwien.
+const pnlColor = (n: number | null | undefined) =>
+  n == null ? "text-foreground" : n >= 0 ? "text-accent" : "text-destructive";
+
+const withSign = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(2)}`;
 
 // Sekcja "market scope": pole na ticker + wybor zakresu + wykres swiecowy.
 // Cala logika (fetch, stany) zyje tu; PriceChart tylko maluje wynik.
@@ -17,10 +25,12 @@ export function MarketScope() {
   const [period, setPeriod] = useState<Period>("6mo");
 
   const [data, setData] = useState<StockHistory | null>(null);
+  const [metrics, setMetrics] = useState<StockMetrics | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Pobierz historie za kazdym razem, gdy zmieni sie spolka albo zakres.
+  // Pobierz historie ORAZ metryki za kazdym razem, gdy zmieni sie spolka/zakres.
+  // Dwa niezalezne strzaly - wykres i statystyki moga dojsc w innym tempie.
   useEffect(() => {
     let aktualne = true; // straznik: ignoruj odpowiedz starego zapytania
     setLoading(true);
@@ -39,6 +49,10 @@ export function MarketScope() {
       .finally(() => {
         if (aktualne) setLoading(false);
       });
+
+    getStockMetrics(ticker, period)
+      .then((m) => aktualne && setMetrics(m))
+      .catch(() => aktualne && setMetrics(null));
 
     return () => {
       aktualne = false; // odpowiedz przyjdzie za pozno -> odrzuc ja
@@ -111,6 +125,37 @@ export function MarketScope() {
             )}
           </div>
 
+          {/* Panel metryk quant (warstwa 6): zwrot, ryzyko, ja vs rynek */}
+          {metrics && metrics.ticker === ticker && (
+            <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+              <StatTile
+                label={`Zwrot ${period}`}
+                value={`${withSign(metrics.return_pct)}%`}
+                className={pnlColor(metrics.return_pct)}
+              />
+              <StatTile
+                label="Zmiennosc (rok)"
+                value={`${metrics.volatility_pct.toFixed(2)}%`}
+                className="text-accent-tertiary"
+              />
+              <StatTile
+                label="Max drawdown"
+                value={`${metrics.max_drawdown_pct.toFixed(2)}%`}
+                className="text-destructive"
+              />
+              <StatTile
+                label={`vs ${metrics.benchmark.ticker}`}
+                value={metrics.alpha_pct != null ? `${withSign(metrics.alpha_pct)}%` : "—"}
+                className={pnlColor(metrics.alpha_pct)}
+                hint={
+                  metrics.benchmark.return_pct != null
+                    ? `rynek ${withSign(metrics.benchmark.return_pct)}%`
+                    : undefined
+                }
+              />
+            </div>
+          )}
+
           {/* Stany: blad / ladowanie / wykres */}
           {error ? (
             <div className="cyber-chamfer border-2 border-destructive bg-card p-6 font-mono text-sm text-destructive">
@@ -130,5 +175,30 @@ export function MarketScope() {
         </div>
       </div>
     </section>
+  );
+}
+
+// Pojedynczy kafelek metryki: etykieta + duza wartosc + opcjonalna podpowiedz.
+function StatTile({
+  label,
+  value,
+  className,
+  hint,
+}: {
+  label: string;
+  value: string;
+  className?: string;
+  hint?: string;
+}) {
+  return (
+    <div className="cyber-chamfer-sm border border-border bg-[#12121a] px-4 py-3">
+      <p className="font-mono text-[0.6rem] uppercase tracking-[0.2em] text-muted-foreground">
+        {label}
+      </p>
+      <p className={`mt-1 font-display text-xl font-bold ${className ?? "text-foreground"}`}>
+        {value}
+      </p>
+      {hint && <p className="mt-0.5 font-mono text-[0.6rem] text-muted-foreground">{hint}</p>}
+    </div>
   );
 }

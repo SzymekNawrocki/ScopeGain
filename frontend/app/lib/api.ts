@@ -89,6 +89,31 @@ export type StockHistory = {
 export const PERIODS = ["1mo", "3mo", "6mo", "1y", "5y"] as const;
 export type Period = (typeof PERIODS)[number];
 
+// Metryki quant spolki + porownanie z rynkiem (S&P 500).
+export type StockMetrics = {
+  ticker: string;
+  period: string;
+  return_pct: number; // zwrot za okres (backtest "gdybym kupil na start")
+  volatility_pct: number; // zmiennosc (ryzyko), zroczniona
+  max_drawdown_pct: number; // najwieksze obsuniecie (liczba ujemna)
+  benchmark: { ticker: string; return_pct: number | null };
+  alpha_pct: number | null; // nadwyzka nad rynkiem (dodatnia = bijesz rynek)
+};
+
+// Pobiera metryki quant dla spolki za dany zakres.
+export async function getStockMetrics(
+  ticker: string,
+  period: Period = "6mo",
+): Promise<StockMetrics> {
+  const res = await fetch(
+    `${API_BASE}/stock/${encodeURIComponent(ticker)}/metrics?period=${period}`,
+  );
+  if (!res.ok) {
+    throw new Error(`API zwrocilo ${res.status}`);
+  }
+  return res.json();
+}
+
 // Pobiera historie swiec dla spolki. 404 = zly ticker -> czytelny komunikat.
 export async function getStockHistory(
   ticker: string,

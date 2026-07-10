@@ -38,3 +38,21 @@ def latest_prices(tickers: list[str]) -> dict[str, float]:
         if not seria.empty:
             ceny[str(kolumna).upper()] = float(seria.iloc[-1])  # ostatnia cena
     return ceny
+
+
+def close_series(ticker: str, period: str = "6mo") -> pd.Series:
+    """Szereg cen zamkniecia jednej spolki za dany okres (do metryk quant).
+
+    Zwraca czysta pandas Series (bez NaN). Pusta Series = brak danych/zly ticker.
+    """
+    dane = yf.download(
+        ticker, period=period, interval="1d", progress=False, auto_adjust=True
+    )
+    if dane.empty:
+        return pd.Series(dtype=float)
+
+    close = dane["Close"]
+    # Przy jednej spolce "Close" bywa DataFrame z jedna kolumna - bierzemy ja.
+    if isinstance(close, pd.DataFrame):
+        close = close.iloc[:, 0]
+    return close.dropna()
