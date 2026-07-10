@@ -99,14 +99,16 @@ export function PortfolioVsMarket({ portfolios }: { portfolios: Portfolio[] }) {
     };
   }, [selectedId, period]);
 
-  if (portfolios.length === 0) return null; // nie ma czego porownywac
+  if (portfolios.length === 0) {
+    return (
+      <p className="font-mono text-sm text-muted-foreground">
+        <span className="text-accent">$</span> zaloz portfel i dodaj pozycje, zeby zobaczyc analize.
+      </p>
+    );
+  }
 
   return (
-    <section className="mb-12">
-      <p className="mb-4 font-mono text-xs uppercase tracking-[0.3em] text-accent-tertiary">
-        <span className="text-accent">$</span> ./portfolio --vs-market
-      </p>
-
+    <div className="mb-12">
       <div className="cyber-chamfer border border-border bg-card">
         <header className="flex items-center gap-2 border-b border-border bg-muted/40 px-4 py-2">
           <span className="h-2.5 w-2.5 rounded-full bg-destructive" />
@@ -219,7 +221,7 @@ export function PortfolioVsMarket({ portfolios }: { portfolios: Portfolio[] }) {
           )}
         </div>
       </div>
-    </section>
+    </div>
   );
 }
 
