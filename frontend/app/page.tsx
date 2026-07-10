@@ -1,65 +1,82 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useEffect, useState } from "react";
+import { getPortfolios, Portfolio } from "./lib/api";
+import { PortfolioCard } from "./components/PortfolioCard";
+
+export default function Dashboard() {
+  // Trzy stany zycia danych: ladowanie -> (sukces | blad).
+  const [portfolios, setPortfolios] = useState<Portfolio[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // useEffect z pusta lista zaleznosci = uruchom raz, gdy komponent wejdzie.
+  // fetch leci z PRZEGLADARKI -> bez CORS na backendzie przegladarka tu zablokuje.
+  useEffect(() => {
+    getPortfolios()
+      .then(setPortfolios)
+      .catch((e) => setError(e.message ?? "Brak polaczenia z API"));
+  }, []);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+    <main className="mx-auto max-w-7xl px-6 py-16">
+      {/* NAGLOWEK */}
+      <header className="mb-12">
+        <p className="mb-3 font-mono text-xs uppercase tracking-[0.3em] text-accent-tertiary">
+          <span className="text-accent">$</span> ./scopegain --connect
+        </p>
+        <h1 className="glitch font-display text-6xl font-black uppercase tracking-widest text-foreground sm:text-7xl">
+          ScopeGain
+        </h1>
+        <p className="mt-4 max-w-xl font-mono text-sm leading-relaxed text-muted-foreground">
+          Terminal analizy portfela. Dane na zywo z lokalnego API.
+          <span className="cursor-blink" />
+        </p>
+      </header>
+
+      {/* STANY */}
+      {error ? (
+        <ErrorPanel message={error} />
+      ) : portfolios === null ? (
+        <LoadingPanel />
+      ) : portfolios.length === 0 ? (
+        <EmptyPanel />
+      ) : (
+        <section className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {portfolios.map((p) => (
+            <PortfolioCard key={p.id} portfolio={p} />
+          ))}
+        </section>
+      )}
+    </main>
+  );
+}
+
+function LoadingPanel() {
+  return (
+    <div className="cyber-chamfer border border-border bg-card p-8 font-mono text-sm text-accent">
+      <span className="cursor-blink">&gt; nawiazywanie polaczenia z API</span>
+    </div>
+  );
+}
+
+function ErrorPanel({ message }: { message: string }) {
+  return (
+    <div className="cyber-chamfer border-2 border-destructive bg-card p-8 font-mono text-sm text-destructive shadow-[0_0_20px_#ff336640]">
+      <p className="mb-2 uppercase tracking-[0.2em]">// signal lost</p>
+      <p className="text-foreground">
+        Nie udalo sie pobrac danych: <span className="text-destructive">{message}</span>
+      </p>
+      <p className="mt-3 text-xs text-muted-foreground">
+        Sprawdz, czy backend chodzi na :8000 i ma wlaczone CORS.
+      </p>
+    </div>
+  );
+}
+
+function EmptyPanel() {
+  return (
+    <div className="cyber-chamfer border border-border bg-card p-8 font-mono text-sm text-muted-foreground">
+      <span className="text-accent">$</span> brak portfeli w bazie — utworz pierwszy przez API.
     </div>
   );
 }

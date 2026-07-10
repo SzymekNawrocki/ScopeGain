@@ -111,10 +111,10 @@ i rozumiem, dlaczego działa.
 
 ### Warstwa 4 — Frontend / dashboard  ← TU JESTEM
 - [x] **4a.** Endpointy portfela w API: `POST /portfolios`, `GET /portfolios` (+ Pydantic!)
-- [ ] **4b.** Next.js gada z moim API
-- [ ] Widok portfela: lista pozycji + wartości
+- [x] **4b.** Next.js gada z moim API (fetch z przeglądarki + CORS na backendzie)
+- [x] Widok portfela: lista pozycji + koszt wejścia (design cyberpunk wg DESIGN.md)
 - [ ] Wykres kursu (Lightweight Charts)
-- **Zaskok:** „to wygląda jak prawdziwa apka giełdowa" ← pierwszy duży efekt „wow"
+- **Zaskok:** „to wygląda jak prawdziwa apka giełdowa" ← pierwszy duży efekt „wow" ✅
 - **Teoria:** fetch do API, CORS, komponenty (dużo już umiem)
 
 ### Warstwa 5 — Auth + sekrety
