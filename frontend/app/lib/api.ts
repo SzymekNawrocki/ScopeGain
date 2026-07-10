@@ -111,6 +111,35 @@ export async function getPortfolioPerformance(
   return res.json();
 }
 
+// --- Werdykt: apka MOWI, co z liczb wynika (warstwa 6f) ---
+export type Severity = "good" | "warn" | "bad";
+
+export type VerdictFinding = {
+  severity: Severity;
+  title: string;
+  detail: string;
+};
+
+export type PortfolioVerdict = {
+  id: number;
+  name: string;
+  period: string;
+  grade: Severity; // ocena laczna
+  grade_label: string; // slowo: mocny / przecietny / slaby
+  findings: VerdictFinding[];
+};
+
+export async function getPortfolioVerdict(
+  id: number,
+  period: Period = "1y",
+): Promise<PortfolioVerdict> {
+  const res = await fetch(`${API_BASE}/portfolios/${id}/verdict?period=${period}`);
+  if (!res.ok) {
+    throw new Error(`API zwrocilo ${res.status}`);
+  }
+  return res.json();
+}
+
 // --- Korelacje miedzy spolkami w portfelu (warstwa 6d) ---
 // matrix[i][j] = korelacja spolki tickers[i] z tickers[j] (od -1 do 1).
 export type PortfolioCorrelations = {

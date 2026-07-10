@@ -1,3 +1,4 @@
+from collections import defaultdict
 from typing import Literal
 
 import pandas as pd
@@ -5,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from analysis import build_verdict
 from database import get_db
 from market import BENCHMARK, close_series, closes_frame, latest_prices
 from models import Portfolio, Position
@@ -15,6 +17,9 @@ from quant import (
     sharpe_ratio,
     total_return_pct,
 )
+
+# Ludzka nazwa benchmarku do komunikatow (SPY = ETF na S&P 500).
+BENCHMARK_LABEL = "S&P 500"
 from schemas import (
     PortfolioCreate,
     PortfolioRead,
@@ -184,6 +189,76 @@ def portfolio_performance(
         "risk": ryzyko,
         "series": seria,
     }
+
+
+# WERDYKT: apka nie tylko liczy, ale MOWI, co z liczb wynika. Zbiera alpha,
+# Sharpe, zmiennosc vs rynek, korelacje i koncentracje w wnioski + ocene.
+# Wszystko z JEDNEJ tabeli cen (closes_frame) + rynku - bez zbednych strzalow.
+@router.get("/{portfolio_id}/verdict")
+def portfolio_verdict(
+    portfolio_id: int,
+    period: Literal["1mo", "3mo", "6mo", "1y", "5y"] = "1y",
+    db: Session = Depends(get_db),
+):
+    portfel = db.get(Portfolio, portfolio_id)
+    if portfel is None:
+        raise HTTPException(status_code=404, detail=f"Nie ma portfela o id {portfolio_id}.")
+    if not portfel.positions:
+        raise HTTPException(status_code=400, detail="Portfel jest pusty - nie ma co oceniac.")
+
+    # Sumujemy ilosci per ticker (ten sam ticker moze byc w kilku pozycjach).
+    ilosci: dict[str, float] = defaultdict(float)
+    for p in portfel.positions:
+        ilosci[p.ticker.upper()] += float(p.quantity)
+
+    ceny = closes_frame(list(ilosci.keys()), period)
+    if ceny.empty:
+        raise HTTPException(status_code=404, detail="Brak danych rynkowych dla tego portfela.")
+
+    tickery = list(ceny.columns)
+
+    # Wartosc portfela dzien po dniu -> zwroty, zmiennosc, Sharpe.
+    wartosc = pd.Series(0.0, index=ceny.index)
+    for t in tickery:
+        wartosc = wartosc + ilosci[t] * ceny[t]
+    port_idx = wartosc / wartosc.iloc[0] * 100
+    port_ret = port_idx.pct_change().dropna()
+    port_zwrot = float(port_idx.iloc[-1] - 100)
+    port_vol = annualized_volatility_pct(port_ret)
+
+    # Rynek za ten sam okres (wyrownany po datach).
+    bench = close_series(BENCHMARK, period).reindex(port_idx.index).ffill().bfill()
+    bench_idx = bench / bench.iloc[0] * 100
+    bench_zwrot = float(bench_idx.iloc[-1] - 100)
+    bench_vol = annualized_volatility_pct(bench_idx.pct_change().dropna())
+
+    # Srednia korelacja miedzy spolkami (bez przekatnej) - miara dywersyfikacji.
+    avg_corr = None
+    if len(tickery) >= 2:
+        macierz = returns_frame(ceny).corr().values
+        n = len(macierz)
+        avg_corr = float((macierz.sum() - n) / (n * n - n))  # -n usuwa przekatna (jedynki)
+
+    # Koncentracja: udzial najwiekszej pozycji wg dzisiejszej wyceny.
+    ostatnie = ceny.iloc[-1]
+    wagi = {t: ilosci[t] * float(ostatnie[t]) for t in tickery}
+    suma = sum(wagi.values())
+    top_ticker = max(wagi, key=wagi.get) if wagi else None
+    top_weight = (wagi[top_ticker] / suma * 100) if suma and top_ticker else 0.0
+
+    werdykt = build_verdict(
+        benchmark_label=BENCHMARK_LABEL,
+        alpha_pct=port_zwrot - bench_zwrot,
+        sharpe=sharpe_ratio(port_ret),
+        port_vol=port_vol,
+        bench_vol=bench_vol,
+        avg_corr=avg_corr,
+        n_tickers=len(tickery),
+        top_weight_pct=top_weight,
+        top_ticker=top_ticker,
+    )
+
+    return {"id": portfel.id, "name": portfel.name, "period": period, **werdykt}
 
 
 # Korelacje miedzy spolkami w portfelu (na dziennych zwrotach).

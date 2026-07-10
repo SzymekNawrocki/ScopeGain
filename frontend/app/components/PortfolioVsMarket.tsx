@@ -4,14 +4,34 @@ import { useEffect, useState } from "react";
 import {
   getPortfolioCorrelations,
   getPortfolioPerformance,
+  getPortfolioVerdict,
   PERIODS,
   Period,
   Portfolio,
   PortfolioCorrelations,
   PortfolioPerformance,
+  PortfolioVerdict,
+  Severity,
 } from "../lib/api";
 import { PerformanceChart } from "./PerformanceChart";
 import { CorrelationMatrix } from "./CorrelationMatrix";
+
+// Wizualny jezyk oceny: kolor kropki/tekstu wg wagi wniosku.
+const SEV_DOT: Record<Severity, string> = {
+  good: "bg-accent",
+  warn: "bg-[#ffcc00]",
+  bad: "bg-destructive",
+};
+const SEV_TEXT: Record<Severity, string> = {
+  good: "text-accent",
+  warn: "text-[#ffcc00]",
+  bad: "text-destructive",
+};
+const SEV_LABEL: Record<Severity, string> = {
+  good: "MOCNY",
+  warn: "PRZECIETNY",
+  bad: "SLABY",
+};
 
 const pnlColor = (n: number | null | undefined) =>
   n == null ? "text-foreground" : n >= 0 ? "text-accent" : "text-destructive";
@@ -39,6 +59,7 @@ export function PortfolioVsMarket({ portfolios }: { portfolios: Portfolio[] }) {
   const [period, setPeriod] = useState<Period>("1y");
   const [perf, setPerf] = useState<PortfolioPerformance | null>(null);
   const [corr, setCorr] = useState<PortfolioCorrelations | null>(null);
+  const [verdict, setVerdict] = useState<PortfolioVerdict | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -68,6 +89,10 @@ export function PortfolioVsMarket({ portfolios }: { portfolios: Portfolio[] }) {
     getPortfolioCorrelations(selectedId, period)
       .then((c) => aktualne && setCorr(c))
       .catch(() => aktualne && setCorr(null));
+
+    getPortfolioVerdict(selectedId, period)
+      .then((v) => aktualne && setVerdict(v))
+      .catch(() => aktualne && setVerdict(null));
 
     return () => {
       aktualne = false;
@@ -128,6 +153,9 @@ export function PortfolioVsMarket({ portfolios }: { portfolios: Portfolio[] }) {
               ))}
             </div>
           </div>
+
+          {/* WERDYKT - apka mowi wprost, co z liczb wynika (wniosek najpierw) */}
+          {verdict && verdict.id === selectedId && <VerdictPanel verdict={verdict} />}
 
           {/* Podsumowanie: portfel / rynek / alpha + legenda */}
           {perf && (
@@ -192,6 +220,35 @@ export function PortfolioVsMarket({ portfolios }: { portfolios: Portfolio[] }) {
         </div>
       </div>
     </section>
+  );
+}
+
+// Panel werdyktu: ocena laczna + lista wnioskow po ludzku z kolorem wagi.
+function VerdictPanel({ verdict }: { verdict: PortfolioVerdict }) {
+  const g = verdict.grade;
+  return (
+    <div className="cyber-chamfer-sm mb-5 border border-border bg-[#12121a] p-4">
+      <div className="mb-3 flex items-center justify-between border-b border-border pb-3">
+        <p className="font-mono text-[0.65rem] uppercase tracking-[0.2em] text-muted-foreground">
+          Werdykt - czego broker Ci nie powie
+        </p>
+        <span className={`flex items-center gap-2 font-display text-sm font-bold ${SEV_TEXT[g]}`}>
+          <span className={`inline-block h-2.5 w-2.5 rounded-full ${SEV_DOT[g]}`} />
+          ocena: {SEV_LABEL[g]}
+        </span>
+      </div>
+      <ul className="space-y-2.5">
+        {verdict.findings.map((f, i) => (
+          <li key={i} className="flex gap-3">
+            <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${SEV_DOT[f.severity]}`} />
+            <div>
+              <p className={`font-mono text-sm font-bold ${SEV_TEXT[f.severity]}`}>{f.title}</p>
+              <p className="font-mono text-xs text-muted-foreground">{f.detail}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
