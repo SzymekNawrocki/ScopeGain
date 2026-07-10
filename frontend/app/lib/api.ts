@@ -100,6 +100,25 @@ export async function getPortfolioPerformance(
   return res.json();
 }
 
+// --- Korelacje miedzy spolkami w portfelu (warstwa 6d) ---
+// matrix[i][j] = korelacja spolki tickers[i] z tickers[j] (od -1 do 1).
+export type PortfolioCorrelations = {
+  period: string;
+  tickers: string[];
+  matrix: number[][];
+};
+
+export async function getPortfolioCorrelations(
+  id: number,
+  period: Period = "6mo",
+): Promise<PortfolioCorrelations> {
+  const res = await fetch(`${API_BASE}/portfolios/${id}/correlations?period=${period}`);
+  if (!res.ok) {
+    throw new Error(`API zwrocilo ${res.status}`);
+  }
+  return res.json();
+}
+
 // --- Historia kursu (swiece OHLC) do wykresu ---
 
 // Jedna swieca. Ksztalt 1:1 z tym, czego oczekuje Lightweight Charts.

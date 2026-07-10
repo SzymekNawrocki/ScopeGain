@@ -13,6 +13,15 @@ import pandas as pd
 TRADING_DAYS = 252
 
 
+def returns_frame(closes: pd.DataFrame) -> pd.DataFrame:
+    """Dzienne zwroty dla TABELI cen (wiele spolek naraz) - do korelacji.
+
+    To samo co daily_returns, ale kolumna po kolumnie. dropna() wywala
+    pierwszy dzien (bez "wczoraj") dla calej tabeli.
+    """
+    return closes.pct_change().dropna()
+
+
 def daily_returns(close: pd.Series) -> pd.Series:
     """Dzienne zwroty procentowe: (dzis - wczoraj) / wczoraj.
 

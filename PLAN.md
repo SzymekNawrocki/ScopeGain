@@ -126,13 +126,19 @@ i rozumiem, dlaczego działa.
 - **Zaskok:** „mam prawdziwe logowanie, które sam napisałem"
 - **Teoria:** hashowanie haseł, tokeny, po co sekrety poza kodem
 
-### Warstwa 6 — Quant (serce projektu)
-- [ ] Metryki ryzyka (zmienność, max drawdown)
-- [ ] Korelacje między spółkami
-- [ ] Prosty backtest: „gdybym kupił X rok temu, mam +Y%"
-- [ ] Porównanie „ja vs rynek" (np. vs S&P 500)
-- **Zaskok:** „moja apka daje realny wgląd inwestycyjny"
-- **Teoria:** statystyka finansowa, zmienność, drawdown, benchmark
+### ✅ Warstwa 6 — Quant (serce projektu) — ZROBIONE
+- [x] **6a.** Żywa wycena portfela + P&L: `GET /portfolios/{id}/valuation`
+      (baza × ceny z rynku → zysk/strata na karcie, zielone/czerwone)
+- [x] **6b.** Metryki ryzyka + „ja vs rynek": `GET /stock/{ticker}/metrics`
+      (zwrot, zmienność, max drawdown, alpha vs S&P 500) → panel kafelków
+- [x] **6c.** Backtest w czasie: `GET /portfolios/{id}/performance`
+      (krzywa portfel vs SPY, obie od 100) → dwuliniowy wykres
+- [x] **6d.** Korelacje między spółkami: `GET /portfolios/{id}/correlations`
+      → mapa cieplna (dywersyfikacja)
+- **Kod:** czyste obliczenia w `quant.py` (pandas/numpy), dane rynkowe w
+  `market.py` (yfinance) — oddzielone od API, żeby dało się testować.
+- **Zaskok:** „moja apka daje realny wgląd inwestycyjny" ✅
+- **Teoria:** statystyka finansowa, zmienność, drawdown, benchmark, korelacja
 
 ### Warstwa 7 — Konteneryzacja (Docker)
 - [ ] Dockerfile dla backendu
@@ -180,7 +186,9 @@ i rozumiem, dlaczego działa.
 - [x] **Warstwa 2** — Backend FastAPI ✅
 - [x] **Warstwa 3** — Baza Postgres + Alembic ✅
 - [x] **Warstwa 4** — Frontend / dashboard (portfele + wykres świecowy) ✅
-- [ ] **Warstwa 5** — Auth + sekrety ← **START tutaj** (rejestracja/logowanie, JWT)
+- [x] **Warstwa 6** — Quant: wycena+P&L, ryzyko, backtest vs rynek, korelacje ✅
+- [ ] **Warstwa 5** — Auth + sekrety (odłożona świadomie — najpierw serce inwestycyjne)
+- [ ] **Warstwy 7–11** — Docker, chmura, CI/CD, monitoring, security (później)
 
 **Repo:** https://github.com/SzymekNawrocki/ScopeGain
 **Układ:** monorepo — `backend/` (FastAPI) + `frontend/` (Next.js)

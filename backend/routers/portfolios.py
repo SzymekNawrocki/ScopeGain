@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from market import BENCHMARK, close_series, closes_frame, latest_prices
 from models import Portfolio, Position
-from quant import total_return_pct
+from quant import returns_frame, total_return_pct
 from schemas import (
     PortfolioCreate,
     PortfolioRead,
@@ -163,6 +163,36 @@ def portfolio_performance(
         "alpha_pct": round(portfel_zwrot - bench_zwrot, 2),
         "series": seria,
     }
+
+
+# Korelacje miedzy spolkami w portfelu (na dziennych zwrotach).
+# Blisko +1 = spolki chodza razem (slaba dywersyfikacja - jak jedna spada,
+# druga tez). Blisko 0 lub ujemna = niezalezne (lepiej rozlozone ryzyko).
+@router.get("/{portfolio_id}/correlations")
+def portfolio_correlations(
+    portfolio_id: int,
+    period: Literal["1mo", "3mo", "6mo", "1y", "5y"] = "6mo",
+    db: Session = Depends(get_db),
+):
+    portfel = db.get(Portfolio, portfolio_id)
+    if portfel is None:
+        raise HTTPException(status_code=404, detail=f"Nie ma portfela o id {portfolio_id}.")
+
+    tickery = sorted({p.ticker.upper() for p in portfel.positions})
+    # Korelacja ma sens dopiero dla >= 2 ROZNYCH spolek.
+    if len(tickery) < 2:
+        return {"period": period, "tickers": tickery, "matrix": [[1.0]] if tickery else []}
+
+    ceny = closes_frame(tickery, period)
+    if ceny.empty:
+        raise HTTPException(status_code=404, detail="Brak danych rynkowych dla tego portfela.")
+
+    corr = returns_frame(ceny).corr()   # pandas liczy cala macierz korelacji
+    kolumny = [str(c) for c in corr.columns]
+    macierz = [[round(float(corr.iloc[i, j]), 2) for j in range(len(kolumny))]
+               for i in range(len(kolumny))]
+
+    return {"period": period, "tickers": kolumny, "matrix": macierz}
 
 
 @router.post(

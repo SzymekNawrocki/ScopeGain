@@ -2,13 +2,16 @@
 
 import { useEffect, useState } from "react";
 import {
+  getPortfolioCorrelations,
   getPortfolioPerformance,
   PERIODS,
   Period,
   Portfolio,
+  PortfolioCorrelations,
   PortfolioPerformance,
 } from "../lib/api";
 import { PerformanceChart } from "./PerformanceChart";
+import { CorrelationMatrix } from "./CorrelationMatrix";
 
 const pnlColor = (n: number | null | undefined) =>
   n == null ? "text-foreground" : n >= 0 ? "text-accent" : "text-destructive";
@@ -19,6 +22,7 @@ export function PortfolioVsMarket({ portfolios }: { portfolios: Portfolio[] }) {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [period, setPeriod] = useState<Period>("1y");
   const [perf, setPerf] = useState<PortfolioPerformance | null>(null);
+  const [corr, setCorr] = useState<PortfolioCorrelations | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -44,6 +48,10 @@ export function PortfolioVsMarket({ portfolios }: { portfolios: Portfolio[] }) {
         }
       })
       .finally(() => aktualne && setLoading(false));
+
+    getPortfolioCorrelations(selectedId, period)
+      .then((c) => aktualne && setCorr(c))
+      .catch(() => aktualne && setCorr(null));
 
     return () => {
       aktualne = false;
@@ -149,6 +157,17 @@ export function PortfolioVsMarket({ portfolios }: { portfolios: Portfolio[] }) {
               {perf && (
                 <PerformanceChart series={perf.series} benchmarkLabel={perf.benchmark_ticker} />
               )}
+            </div>
+          )}
+
+          {/* Korelacje: jak bardzo spolki chodza razem (dywersyfikacja) */}
+          {corr && (
+            <div className="mt-6 border-t border-border pt-5">
+              <p className="mb-3 font-mono text-[0.65rem] uppercase tracking-[0.2em] text-muted-foreground">
+                Korelacje — <span className="text-accent">0 = niezalezne (dobra dywersyfikacja)</span>,{" "}
+                <span className="text-accent-secondary">+1 = chodza razem</span>
+              </p>
+              <CorrelationMatrix tickers={corr.tickers} matrix={corr.matrix} />
             </div>
           )}
         </div>
