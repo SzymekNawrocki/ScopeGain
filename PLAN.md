@@ -212,8 +212,12 @@ i rozumiem, dlaczego działa.
 - `analysis.py` — silnik reguł werdyktu (liczby → wnioski + ocena)
 - `market.py` — jedyne miejsce z yfinance (ceny, historia, benchmark SPY)
 
-**Do dopchnięcia (używalność):** edycja pozycji, testy pytest (wciąż brak!),
-globalny wybór portfela w pasku. **Analiza — dalej:** „co napędza wynik", „ile netto (Belka)".
+**Testy:** `backend/tests/` — pytest na `quant.py` (zwroty, zmiennosc, Sharpe, beta,
+max drawdown) i `analysis.py` (kazda galaz reguly werdyktu + agregacja oceny).
+Odpalenie: `cd backend && .venv\Scripts\python.exe -m pytest tests/ -v`.
+
+**Do dopchnięcia (używalność):** edycja pozycji, globalny wybór portfela w pasku.
+**Analiza — dalej:** „co napędza wynik", „ile netto (Belka)".
 
 **Repo:** https://github.com/SzymekNawrocki/ScopeGain
 **Układ:** monorepo — `backend/` (FastAPI) + `frontend/` (Next.js)
