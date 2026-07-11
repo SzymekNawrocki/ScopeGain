@@ -28,7 +28,7 @@ export function PerformanceChart({
       autoSize: true,
       layout: {
         background: { type: ColorType.Solid, color: "#12121a" },
-        textColor: "#6b7280",
+        textColor: "#9ca3af",
         fontFamily: "var(--font-jetbrains), monospace",
         attributionLogo: false,
       },

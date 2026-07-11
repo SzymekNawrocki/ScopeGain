@@ -47,7 +47,7 @@ export function AddPositionForm({
     return (
       <button
         onClick={() => setOpen(true)}
-        className="mt-4 w-full cyber-chamfer-sm border border-dashed border-border py-2 font-mono text-xs uppercase tracking-wider text-muted-foreground transition-all hover:border-accent hover:text-accent"
+        className="mt-4 w-full cyber-chamfer-sm border border-dashed border-border py-2 font-mono text-sm uppercase tracking-wider text-muted-foreground transition-all hover:border-accent hover:text-accent"
       >
         + dodaj pozycje
       </button>
@@ -83,12 +83,12 @@ export function AddPositionForm({
           className={inputCls}
         />
       </div>
-      {error && <p className="font-mono text-xs text-destructive">{error}</p>}
+      {error && <p className="font-mono text-sm text-destructive">{error}</p>}
       <div className="flex gap-2">
         <button
           type="submit"
           disabled={busy}
-          className="cyber-chamfer-sm flex-1 border border-accent bg-accent/10 py-1.5 font-mono text-xs uppercase tracking-wider text-accent transition-all hover:shadow-glow disabled:opacity-50"
+          className="cyber-chamfer-sm flex-1 border border-accent bg-accent/10 py-1.5 font-mono text-sm uppercase tracking-wider text-accent transition-all hover:shadow-glow disabled:opacity-50"
         >
           {busy ? "sprawdzam rynek..." : "dodaj"}
         </button>
@@ -98,7 +98,7 @@ export function AddPositionForm({
             setOpen(false);
             setError(null);
           }}
-          className="cyber-chamfer-sm border border-border px-3 py-1.5 font-mono text-xs uppercase tracking-wider text-muted-foreground transition-all hover:border-destructive hover:text-destructive"
+          className="cyber-chamfer-sm border border-border px-3 py-1.5 font-mono text-sm uppercase tracking-wider text-muted-foreground transition-all hover:border-destructive hover:text-destructive"
         >
           anuluj
         </button>

@@ -21,7 +21,7 @@ export function Nav() {
             <a
               key={id}
               href={`#${id}`}
-              className="cyber-chamfer-sm border border-transparent px-3 py-1.5 font-mono text-xs uppercase tracking-wider text-muted-foreground transition-all hover:border-accent hover:text-accent"
+              className="cyber-chamfer-sm border border-transparent px-3 py-1.5 font-mono text-sm uppercase tracking-wider text-muted-foreground transition-all hover:border-accent hover:text-accent"
             >
               {label}
             </a>

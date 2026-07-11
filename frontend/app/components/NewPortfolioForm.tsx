@@ -32,7 +32,7 @@ export function NewPortfolioForm({ onChanged }: { onChanged: () => void }) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="cyber-chamfer-sm mb-6 border border-border px-4 py-2 font-mono text-xs uppercase tracking-wider text-accent transition-all hover:border-accent hover:shadow-glow"
+        className="cyber-chamfer-sm mb-6 border border-border px-4 py-2 font-mono text-sm uppercase tracking-wider text-accent transition-all hover:border-accent hover:shadow-glow"
       >
         + nowy portfel
       </button>
@@ -57,7 +57,7 @@ export function NewPortfolioForm({ onChanged }: { onChanged: () => void }) {
       <button
         type="submit"
         disabled={busy}
-        className="cyber-chamfer-sm border border-accent bg-accent/10 px-4 py-2 font-mono text-xs uppercase tracking-wider text-accent transition-all hover:shadow-glow disabled:opacity-50"
+        className="cyber-chamfer-sm border border-accent bg-accent/10 px-4 py-2 font-mono text-sm uppercase tracking-wider text-accent transition-all hover:shadow-glow disabled:opacity-50"
       >
         {busy ? "..." : "utworz"}
       </button>
@@ -67,11 +67,11 @@ export function NewPortfolioForm({ onChanged }: { onChanged: () => void }) {
           setOpen(false);
           setError(null);
         }}
-        className="cyber-chamfer-sm border border-border px-4 py-2 font-mono text-xs uppercase tracking-wider text-muted-foreground transition-all hover:border-destructive hover:text-destructive"
+        className="cyber-chamfer-sm border border-border px-4 py-2 font-mono text-sm uppercase tracking-wider text-muted-foreground transition-all hover:border-destructive hover:text-destructive"
       >
         anuluj
       </button>
-      {error && <span className="font-mono text-xs text-destructive">{error}</span>}
+      {error && <span className="font-mono text-sm text-destructive">{error}</span>}
     </form>
   );
 }

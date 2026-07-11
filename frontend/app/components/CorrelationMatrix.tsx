@@ -28,7 +28,7 @@ export function CorrelationMatrix({
 
   return (
     <div className="overflow-x-auto">
-      <table className="border-separate border-spacing-1 font-mono text-xs">
+      <table className="border-separate border-spacing-1 font-mono text-sm">
         <thead>
           <tr>
             <th className="p-2" />
@@ -51,7 +51,7 @@ export function CorrelationMatrix({
                   className="cyber-chamfer-sm min-w-[3.5rem] p-2 text-center font-bold"
                   style={{
                     background: i === j ? "rgba(42,42,58,0.4)" : cellBg(v),
-                    color: i === j ? "#6b7280" : "#e0e0e0",
+                    color: i === j ? "#9ca3af" : "#e0e0e0",
                   }}
                 >
                   {v.toFixed(2)}

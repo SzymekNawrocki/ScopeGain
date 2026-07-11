@@ -10,14 +10,8 @@ import {
   getPortfolioValuation,
 } from "../lib/api";
 import { AddPositionForm } from "./AddPositionForm";
-
-const fmt = (n: number) =>
-  n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-const pnlColor = (n: number | null | undefined) =>
-  n == null ? "text-muted-foreground" : n >= 0 ? "text-accent" : "text-destructive";
-
-const sign = (n: number) => (n >= 0 ? "▲ +" : "▼ ");
+import { TerminalWindow } from "./ui/TerminalWindow";
+import { fmt, pnlColor, pnlSign } from "../lib/format";
 
 export function PortfolioCard({
   portfolio,
@@ -70,132 +64,126 @@ export function PortfolioCard({
       <span className="pointer-events-none absolute bottom-0 left-0 h-3 w-3 border-b-2 border-l-2 border-accent" />
       <span className="pointer-events-none absolute bottom-0 right-0 h-3 w-3 border-b-2 border-r-2 border-accent" />
 
-      <div className="cyber-chamfer border border-border bg-card transition-all duration-300 group-hover:border-accent group-hover:shadow-glow">
-        <header className="flex items-center gap-2 border-b border-border bg-muted/40 px-4 py-2">
-          <span className="h-2.5 w-2.5 rounded-full bg-destructive" />
-          <span className="h-2.5 w-2.5 rounded-full bg-[#ffcc00]" />
-          <span className="h-2.5 w-2.5 rounded-full bg-accent" />
-          <span className="ml-2 truncate font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
-            ~/portfolios/{portfolio.id}
-          </span>
-          {val && (
-            <span className={`ml-auto font-mono text-xs font-bold ${pnlColor(val.total_pnl_pct)}`}>
-              {sign(val.total_pnl_pct)}
+      <TerminalWindow
+        className="transition-all duration-300 group-hover:border-accent group-hover:shadow-glow"
+        title={`~/portfolios/${portfolio.id}`}
+        actions={
+          val && (
+            <span className={`font-mono text-xs font-bold ${pnlColor(val.total_pnl_pct)}`}>
+              {pnlSign(val.total_pnl_pct)}
               {fmt(Math.abs(val.total_pnl_pct))}%
             </span>
-          )}
-        </header>
-
-        <div className="p-5">
-          <div className="flex items-start justify-between gap-2">
-            <h2 className="font-display text-xl font-bold uppercase tracking-wide text-foreground text-glow">
-              {portfolio.name}
-            </h2>
-            {/* Usuwanie portfela: dwuklik (pierwszy pyta, drugi kasuje) */}
-            {confirmDel ? (
-              <div className="flex shrink-0 gap-1">
-                <button
-                  onClick={usunPortfel}
-                  className="cyber-chamfer-sm border border-destructive px-2 py-1 font-mono text-[0.6rem] uppercase text-destructive transition-all hover:bg-destructive hover:text-background"
-                >
-                  na pewno?
-                </button>
-                <button
-                  onClick={() => setConfirmDel(false)}
-                  className="font-mono text-[0.6rem] uppercase text-muted-foreground hover:text-foreground"
-                >
-                  nie
-                </button>
-              </div>
-            ) : (
+          )
+        }
+      >
+        <div className="flex items-start justify-between gap-2">
+          <h2 className="font-display text-xl font-bold uppercase tracking-wide text-foreground">
+            {portfolio.name}
+          </h2>
+          {/* Usuwanie portfela: dwuklik (pierwszy pyta, drugi kasuje) */}
+          {confirmDel ? (
+            <div className="flex shrink-0 gap-1">
               <button
-                onClick={() => setConfirmDel(true)}
-                aria-label="Usun portfel"
-                className="shrink-0 font-mono text-sm text-muted-foreground transition-colors hover:text-destructive"
+                onClick={usunPortfel}
+                className="cyber-chamfer-sm border border-destructive px-2 py-1 font-mono text-xs uppercase text-destructive transition-all hover:bg-destructive hover:text-background"
               >
-                usun
+                na pewno?
               </button>
-            )}
-          </div>
-
-          {/* Pozycje */}
-          <div className="mt-4 space-y-1">
-            {portfolio.positions.length === 0 ? (
-              <p className="font-mono text-sm text-muted-foreground">
-                <span className="text-accent">$</span> brak pozycji — dodaj pierwsza nizej
-              </p>
-            ) : (
-              <>
-                <div className="grid grid-cols-[1fr_auto_auto_auto_1.25rem] gap-3 border-b border-border pb-1 font-mono text-[0.65rem] uppercase tracking-[0.2em] text-muted-foreground">
-                  <span>Ticker</span>
-                  <span className="text-right">Ilosc</span>
-                  <span className="text-right">Teraz</span>
-                  <span className="text-right">Zysk</span>
-                  <span />
-                </div>
-                {portfolio.positions.map((pos) => {
-                  const w = wyceny.get(pos.id);
-                  return (
-                    <div
-                      key={pos.id}
-                      className="group/row grid grid-cols-[1fr_auto_auto_auto_1.25rem] items-center gap-3 py-1 font-mono text-sm"
-                    >
-                      <span className="font-bold text-accent-tertiary">{pos.ticker}</span>
-                      <span className="text-right text-foreground">{fmt(pos.quantity)}</span>
-                      <span className="text-right text-muted-foreground">
-                        {w?.current_price != null ? fmt(w.current_price) : "···"}
-                      </span>
-                      <span className={`text-right font-bold ${pnlColor(w?.pnl_pct)}`}>
-                        {w?.pnl_pct != null ? `${w.pnl_pct >= 0 ? "+" : ""}${fmt(w.pnl_pct)}%` : "···"}
-                      </span>
-                      <button
-                        onClick={() => usunPozycje(pos.id)}
-                        aria-label={`Usun ${pos.ticker}`}
-                        className="text-right text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover/row:opacity-100"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  );
-                })}
-              </>
-            )}
-          </div>
-
-          {/* Dodawanie pozycji */}
-          <AddPositionForm portfolioId={portfolio.id} onChanged={onChanged} />
-
-          {/* Podsumowanie */}
-          <footer className="mt-4 space-y-2 border-t border-border pt-3">
-            <div className="flex items-baseline justify-between">
-              <span className="font-mono text-[0.65rem] uppercase tracking-[0.2em] text-muted-foreground">
-                Koszt wejscia
-              </span>
-              <span className="font-mono text-sm text-muted-foreground">
-                ${fmt(val?.total_cost ?? costBasis(portfolio))}
-              </span>
+              <button
+                onClick={() => setConfirmDel(false)}
+                className="font-mono text-xs uppercase text-muted-foreground hover:text-foreground"
+              >
+                nie
+              </button>
             </div>
-            <div className="flex items-baseline justify-between">
-              <span className="font-mono text-[0.65rem] uppercase tracking-[0.2em] text-muted-foreground">
-                Wartosc dzis
-              </span>
-              <span className="font-display text-lg font-bold text-accent text-glow">
-                {val ? `$${fmt(val.total_value)}` : "···"}
-              </span>
-            </div>
-            {val && (
-              <div className="flex items-baseline justify-between">
-                <span className="font-mono text-[0.65rem] uppercase tracking-[0.2em] text-muted-foreground">
-                  Zysk / strata
-                </span>
-                <span className={`font-display text-lg font-bold ${pnlColor(val.total_pnl_abs)}`}>
-                  {val.total_pnl_abs >= 0 ? "+" : "−"}${fmt(Math.abs(val.total_pnl_abs))}
-                </span>
-              </div>
-            )}
-          </footer>
+          ) : (
+            <button
+              onClick={() => setConfirmDel(true)}
+              aria-label="Usun portfel"
+              className="shrink-0 font-mono text-sm text-muted-foreground transition-colors hover:text-destructive"
+            >
+              usun
+            </button>
+          )}
         </div>
-      </div>
+
+        {/* Pozycje */}
+        <div className="mt-4 space-y-1">
+          {portfolio.positions.length === 0 ? (
+            <p className="font-mono text-sm text-muted-foreground">
+              <span className="text-accent">$</span> brak pozycji — dodaj pierwsza nizej
+            </p>
+          ) : (
+            <>
+              <div className="grid grid-cols-[1fr_auto_auto_auto_1.25rem] gap-3 border-b border-border pb-1 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                <span>Ticker</span>
+                <span className="text-right">Ilosc</span>
+                <span className="text-right">Teraz</span>
+                <span className="text-right">Zysk</span>
+                <span />
+              </div>
+              {portfolio.positions.map((pos) => {
+                const w = wyceny.get(pos.id);
+                return (
+                  <div
+                    key={pos.id}
+                    className="group/row grid grid-cols-[1fr_auto_auto_auto_1.25rem] items-center gap-3 py-1 font-mono text-sm"
+                  >
+                    <span className="font-bold text-accent-tertiary">{pos.ticker}</span>
+                    <span className="text-right text-foreground">{fmt(pos.quantity)}</span>
+                    <span className="text-right text-muted-foreground">
+                      {w?.current_price != null ? fmt(w.current_price) : "···"}
+                    </span>
+                    <span className={`text-right font-bold ${pnlColor(w?.pnl_pct)}`}>
+                      {w?.pnl_pct != null ? `${w.pnl_pct >= 0 ? "+" : ""}${fmt(w.pnl_pct)}%` : "···"}
+                    </span>
+                    <button
+                      onClick={() => usunPozycje(pos.id)}
+                      aria-label={`Usun ${pos.ticker}`}
+                      className="text-right text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover/row:opacity-100"
+                    >
+                      ×
+                    </button>
+                  </div>
+                );
+              })}
+            </>
+          )}
+        </div>
+
+        {/* Dodawanie pozycji */}
+        <AddPositionForm portfolioId={portfolio.id} onChanged={onChanged} />
+
+        {/* Podsumowanie */}
+        <footer className="mt-4 space-y-2 border-t border-border pt-3">
+          <div className="flex items-baseline justify-between">
+            <span className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
+              Koszt wejscia
+            </span>
+            <span className="font-mono text-sm text-muted-foreground">
+              ${fmt(val?.total_cost ?? costBasis(portfolio))}
+            </span>
+          </div>
+          <div className="flex items-baseline justify-between">
+            <span className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
+              Wartosc dzis
+            </span>
+            <span className="font-display text-lg font-bold text-accent">
+              {val ? `$${fmt(val.total_value)}` : "···"}
+            </span>
+          </div>
+          {val && (
+            <div className="flex items-baseline justify-between">
+              <span className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                Zysk / strata
+              </span>
+              <span className={`font-display text-lg font-bold ${pnlColor(val.total_pnl_abs)}`}>
+                {val.total_pnl_abs >= 0 ? "+" : "−"}${fmt(Math.abs(val.total_pnl_abs))}
+              </span>
+            </div>
+          )}
+        </footer>
+      </TerminalWindow>
     </article>
   );
 }
