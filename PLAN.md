@@ -118,13 +118,21 @@ i rozumiem, dlaczego działa.
 - **Zaskok:** „to wygląda jak prawdziwa apka giełdowa" ← pierwszy duży efekt „wow" ✅
 - **Teoria:** fetch do API, CORS, komponenty, `useRef` do integracji z biblioteką spoza Reacta
 
-### Warstwa 5 — Auth + sekrety
-- [ ] Rejestracja / logowanie
-- [ ] JWT — token po zalogowaniu
-- [ ] Każdy widzi tylko swój portfel
-- [ ] Klucze i hasła w zmiennych środowiskowych, nie w kodzie
-- **Zaskok:** „mam prawdziwe logowanie, które sam napisałem"
-- **Teoria:** hashowanie haseł, tokeny, po co sekrety poza kodem
+### ✅ Warstwa 5 — Auth + sekrety — ZROBIONE
+- [x] Rejestracja / logowanie (`POST /auth/register`, `/auth/login`, `/logout`, `GET /auth/me`)
+- [x] JWT — podpisany token po zalogowaniu, trzymany w **httpOnly cookie**
+      (JS go nie widzi → odporne na kradziez tokenu przez XSS; produkcyjne podejscie)
+- [x] Każdy widzi tylko swój portfel — model `User`, FK `Portfolio.user_id`,
+      `get_current_user` na wszystkich trasach portfela + scoping po userze
+      (cudzy portfel = 404, nie zdradzamy nawet ze istnieje)
+- [x] Hasla hashowane bcryptem (nigdy jawne w bazie); `SECRET_KEY` z env (dev-default z ostrzezeniem)
+- **Zaskok:** „mam prawdziwe logowanie, które sam napisałem" ✅
+- **Teoria:** hashowanie haseł (bcrypt + sól), JWT (podpis HS256, exp), httpOnly cookie
+  vs localStorage (XSS), CORS z `allow_credentials`, po co sekrety poza kodem
+- **Decyzja:** token w httpOnly cookie, nie localStorage — bezpieczniej (JS nie czyta),
+  kosztem paru ruchomych czesci (CORS credentials, SameSite). Broni sie na rozmowie.
+- **Uwaga:** stary seed-portfel sprzed auth ma `user_id = NULL` (osierocony,
+  niewidoczny dla nikogo) — nowe portfele tworzy sie juz na koncie.
 
 ### ✅ Warstwa 6 — Quant (serce projektu) — ZROBIONE
 - [x] **6a.** Żywa wycena portfela + P&L: `GET /portfolios/{id}/valuation`
@@ -245,16 +253,25 @@ i rozumiem, dlaczego działa.
 - [x] **Warstwa 4** — Frontend / dashboard (portfele + wykres świecowy) ✅
 - [x] **Warstwa 6** — Quant: wycena+P&L, ryzyko, backtest vs rynek, korelacje, Sharpe/beta, WERDYKT ✅
 - [x] **Warstwa UX** — zarządzanie danymi z UI (CRUD) + nawigacja/układ ✅
-- [ ] **Warstwa 5** — Auth + sekrety (odłożona świadomie — najpierw serce inwestycyjne)
+- [x] **Warstwa UX+** — onboarding „jak to działa" (3 kroki) + jaśniejszy nagłówek/puste stany ✅
+- [x] **Warstwa 5** — Auth: rejestracja/logowanie, JWT w httpOnly cookie, portfele per-user ✅
 - [ ] **Warstwy 7–11** — Docker, chmura, CI/CD, monitoring, security (później)
-- [ ] **Warstwa 12** — Realna wartość: P&L netto (koszty+Belka), werdykt zachowania, rebalancing ← **następna**
+- [ ] **Warstwa 12** — Realna wartość: P&L netto (koszty+Belka ✅ 12a), werdykt zachowania (12b), rebalancing (12c) ← **następna**
 - [ ] **Warstwa 13** — Reżimy rynkowe (Markov) — eksploracyjna, po Warstwie 12
 
 **Backend — moduły (mapa):**
-- `routers/` — HTTP: `stock.py` (kursy, historia świec, metryki), `portfolios.py` (CRUD + wycena, backtest, korelacje, werdykt)
+- `routers/` — HTTP: `auth.py` (rejestracja/logowanie/me, ustawia httpOnly cookie),
+  `stock.py` (kursy, historia świec, metryki — publiczne), `portfolios.py` (CRUD + wycena,
+  backtest, korelacje, werdykt — wszystko chronione i scope'owane per-user)
+- `security.py` — bcrypt (hash/verify), JWT (create/decode), `get_current_user` (czyta cookie)
 - `quant.py` — czyste obliczenia (zwroty, zmienność, drawdown, Sharpe, beta)
 - `analysis.py` — silnik reguł werdyktu (liczby → wnioski + ocena)
 - `market.py` — jedyne miejsce z yfinance (ceny, historia, benchmark SPY)
+
+**Frontend — auth (mapa):**
+- `AuthProvider` — jedno źródło prawdy o userze (`/auth/me` na starcie), login/register/logout
+- `AuthGate` — niezalogowany → `AuthPanel` (login/rejestracja); zalogowany → dashboard
+- `AuthStatus` — email + „wyloguj" w pasku; `lib/api.ts` — `apiFetch` dokłada `credentials:"include"`
 
 **Testy:** `backend/tests/` — pytest na `quant.py` (zwroty, zmiennosc, Sharpe, beta,
 max drawdown) i `analysis.py` (kazda galaz reguly werdyktu + agregacja oceny).
@@ -262,6 +279,10 @@ Odpalenie: `cd backend && .venv\Scripts\python.exe -m pytest tests/ -v`.
 
 **Do dopchnięcia (używalność):** edycja pozycji, globalny wybór portfela w pasku.
 **Analiza — dalej:** patrz Warstwa 12 (P&L netto, werdykt zachowania, rebalancing).
+**Kierunek quant (kandydatury + rekomendacja):** `QUANT_ROADMAP.md` — Monte Carlo,
+  granica efektywna (Markowitz), silnik rebalancingu (12c), VaR/stress test.
+  Diagnoza: apka „opisuje przeszłość”, brakuje spojrzenia w przód i konkretu do
+  działania. Decyzja o wyborze następnej funkcji — otwarta.
 
 **Repo:** https://github.com/SzymekNawrocki/ScopeGain
 **Układ:** monorepo — `backend/` (FastAPI) + `frontend/` (Next.js)
