@@ -67,5 +67,10 @@ class PortfolioValuation(BaseModel):
     positions: list[PositionValuation]
     total_cost: float         # suma kosztow wejscia (tylko wycenione pozycje)
     total_value: float        # suma wartosci rynkowej
-    total_pnl_abs: float      # laczny zysk/strata w $
-    total_pnl_pct: float      # laczny zysk/strata w %
+    total_pnl_abs: float      # laczny zysk/strata BRUTTO w $
+    total_pnl_pct: float      # laczny zysk/strata BRUTTO w %
+    # --- P&L netto (warstwa 12a): ile REALNIE zostaje w kieszeni ---
+    total_commission: float   # prowizja maklerska - kupno + (hipotetyczna) sprzedaz dzis
+    total_tax_belka: float    # podatek od zyskow kapitalowych, 19% (tylko od zysku)
+    total_pnl_net_abs: float  # zysk/strata NETTO w $ (brutto - prowizje - podatek)
+    total_pnl_net_pct: float  # zysk/strata NETTO w %

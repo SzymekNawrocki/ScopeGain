@@ -12,6 +12,11 @@ import pandas as pd
 
 TRADING_DAYS = 252
 
+# Zalozenia Warstwy 12a: typowa prowizja maklerska (np. XTB - 0,29% od
+# wartosci transakcji) i polski podatek od zyskow kapitalowych (Belka, 19%).
+BROKER_COMMISSION_PCT = 0.29
+BELKA_TAX_PCT = 19.0
+
 
 def returns_frame(closes: pd.DataFrame) -> pd.DataFrame:
     """Dzienne zwroty dla TABELI cen (wiele spolek naraz) - do korelacji.
@@ -78,6 +83,33 @@ def beta(asset_returns: pd.Series, market_returns: pd.Series) -> float:
     if war_rynku == 0:
         return 0.0
     return float(portfel.cov(rynek) / war_rynku)
+
+
+def net_pnl(
+    cost_basis: float,
+    market_value: float,
+    commission_pct: float = BROKER_COMMISSION_PCT,
+    tax_pct: float = BELKA_TAX_PCT,
+) -> dict[str, float]:
+    """Ile REALNIE zostaje w kieszeni: brutto pomniejszone o prowizje i Belke.
+
+    Prowizja placi sie DWA razy - raz przy kupnie (juz poniesiona, ale nie
+    widac jej w cost_basis), raz przy (hipotetycznej) sprzedazy dzis. Podatek
+    Belka liczy sie od zysku PO odjeciu obu prowizji, i tylko gdy ten zysk
+    jest dodatni - strata nie generuje podatku (uproszczenie: bez rozliczania
+    strat z innych lat).
+    """
+    prowizja_kupno = cost_basis * commission_pct / 100
+    prowizja_sprzedaz = market_value * commission_pct / 100
+    zysk_po_prowizji = (market_value - prowizja_sprzedaz) - (cost_basis + prowizja_kupno)
+    podatek = max(0.0, zysk_po_prowizji) * tax_pct / 100
+    netto = zysk_po_prowizji - podatek
+    return {
+        "commission_total": round(prowizja_kupno + prowizja_sprzedaz, 2),
+        "tax_belka": round(podatek, 2),
+        "net_pnl_abs": round(netto, 2),
+        "net_pnl_pct": round(netto / cost_basis * 100, 2) if cost_basis else 0.0,
+    }
 
 
 def max_drawdown_pct(close: pd.Series) -> float:

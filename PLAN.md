@@ -187,6 +187,48 @@ i rozumiem, dlaczego działa.
 - **Zaskok:** „patrzę na swój kod oczami atakującego"
 - **Teoria:** OWASP Top 10, typowe podatności, myślenie ofensywne
 
+### Warstwa 12 — Realna wartość inwestycyjna (research-driven)
+> **Decyzja (po researchu 07/2026):** dane (DALBAR, badania nad kosztami
+> funduszy, badania nad pułapkami backtestu) NIE potwierdzają, że wyrafinowane
+> sygnały (AI agenci, modele reżimów) to droga do realnej wartości dla
+> inwestora indywidualnego. Trzy rzeczy faktycznie decydują o wyniku: KOSZTY
+> (0,5% opłaty rocznej = ~165k $ straty na 100k $ w 30 lat, przez efekt
+> składany), ZACHOWANIE (DALBAR: -8,5pp/rok w 2024 przez złe momenty
+> wejścia/wyjścia — to główna przyczyna niedoważenia wyniku rynku, nie dobór
+> aktywów) i DYWERSYFIKACJA/KONCENTRACJA (10 największych spółek S&P 500 to
+> już 36% indeksu, 5 lat temu 23%). Ta warstwa dokłada te trzy rzeczy w
+> kolejności wg udowodnionego wpływu — PRZED warstwą reżimów rynkowych (13).
+- [x] **12a.** P&L netto: prowizja maklerska + podatek Belka (19% od zysku)
+      obok istniejącego P&L brutto w `GET /portfolios/{id}/valuation` —
+      ile REALNIE zostaje w kieszeni, nie tylko ile urosła cena.
+      Czyste `quant.net_pnl()` (prowizja 0,29% kupno+sprzedaż, Belka tylko
+      od zysku po prowizjach) + 4 nowe pola w `PortfolioValuation` + wiersz
+      „netto w kieszeni" pod brutto w `PortfolioCard`.
+- [ ] **12b.** Log transakcji + „werdykt zachowania": zapisuj historię
+      kupna/sprzedaży (nie tylko aktualny stan pozycji — nowa tabela/model),
+      żeby werdykt umiał powiedzieć „sprzedałeś X trzy miesiące temu, od
+      tamtej pory rynek urósł o Y%". Atakuje bezpośrednio przyczynę #1
+      niedoważenia wyniku (behavior gap), nie tylko dobór aktywów.
+- [ ] **12c.** Sugestia rebalancingu: werdykt już wykrywa koncentrację
+      (`top_weight_pct` w `analysis.py`) — dołóż konkretną podpowiedź
+      „przytnij X o Y%, dokup Z", nie tylko samo ostrzeżenie.
+- **Zaskok:** „apka mówi mi coś, czego mój dotychczasowy P&L brutto ukrywał"
+- **Teoria:** podatek Belka, efekt składany kosztów, behavior gap, diversification return
+
+### Warstwa 13 — Reżimy rynkowe (Markov) — eksploracyjna, NIE priorytetowa
+> Ciekawa warstwa quant (stan rynku bull/bear/sideways + macierz przejść,
+> zainspirowana materiałem o hedge-fundowym podejściu do rynku), ale zgodnie
+> z Decyzją w Warstwie 12 — to nauka matematyki finansowej, nie droga do
+> realnej wartości. Robię DOPIERO po Warstwie 12.
+- [ ] **13a.** `regime.py`: klasyfikacja stanu rynku + macierz przejść jako
+      czyste, testowalne funkcje (styl `quant.py`)
+- [ ] **13b.** Walk-forward: macierz na dzień `t` liczona TYLKO z danych do
+      `t` (bez lookahead bias — najczęstszy grzech DIY backtestów)
+- [ ] **13c.** Panel w UI: dzisiejszy stan + prognoza (reużywa heatmapy
+      z `CorrelationMatrix`)
+- **Zaskok:** „rozumiem różnicę między ładnym backtestem a takim, który nie kłamie"
+- **Teoria:** łańcuchy Markowa, macierz przejść, walk-forward validation
+
 ---
 
 ## 🧪 Rzeczy dokładane po drodze (nie osobne warstwy)
@@ -205,6 +247,8 @@ i rozumiem, dlaczego działa.
 - [x] **Warstwa UX** — zarządzanie danymi z UI (CRUD) + nawigacja/układ ✅
 - [ ] **Warstwa 5** — Auth + sekrety (odłożona świadomie — najpierw serce inwestycyjne)
 - [ ] **Warstwy 7–11** — Docker, chmura, CI/CD, monitoring, security (później)
+- [ ] **Warstwa 12** — Realna wartość: P&L netto (koszty+Belka), werdykt zachowania, rebalancing ← **następna**
+- [ ] **Warstwa 13** — Reżimy rynkowe (Markov) — eksploracyjna, po Warstwie 12
 
 **Backend — moduły (mapa):**
 - `routers/` — HTTP: `stock.py` (kursy, historia świec, metryki), `portfolios.py` (CRUD + wycena, backtest, korelacje, werdykt)
@@ -217,7 +261,7 @@ max drawdown) i `analysis.py` (kazda galaz reguly werdyktu + agregacja oceny).
 Odpalenie: `cd backend && .venv\Scripts\python.exe -m pytest tests/ -v`.
 
 **Do dopchnięcia (używalność):** edycja pozycji, globalny wybór portfela w pasku.
-**Analiza — dalej:** „co napędza wynik", „ile netto (Belka)".
+**Analiza — dalej:** patrz Warstwa 12 (P&L netto, werdykt zachowania, rebalancing).
 
 **Repo:** https://github.com/SzymekNawrocki/ScopeGain
 **Układ:** monorepo — `backend/` (FastAPI) + `frontend/` (Next.js)

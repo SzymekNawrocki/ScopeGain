@@ -175,10 +175,23 @@ export function PortfolioCard({
           {val && (
             <div className="flex items-baseline justify-between">
               <span className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                Zysk / strata
+                Zysk / strata (brutto)
               </span>
               <span className={`font-display text-lg font-bold ${pnlColor(val.total_pnl_abs)}`}>
                 {val.total_pnl_abs >= 0 ? "+" : "−"}${fmt(Math.abs(val.total_pnl_abs))}
+              </span>
+            </div>
+          )}
+          {val && (
+            <div className="flex items-baseline justify-between" title="Po prowizji maklerskiej (kupno + sprzedaz) i podatku Belka (19% od zysku)">
+              <span className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                Netto w kieszeni
+              </span>
+              <span className={`font-mono text-sm font-bold ${pnlColor(val.total_pnl_net_abs)}`}>
+                {val.total_pnl_net_abs >= 0 ? "+" : "−"}${fmt(Math.abs(val.total_pnl_net_abs))}
+                <span className="ml-1 text-muted-foreground">
+                  ({val.total_pnl_net_pct >= 0 ? "+" : ""}{fmt(val.total_pnl_net_pct)}%)
+                </span>
               </span>
             </div>
           )}

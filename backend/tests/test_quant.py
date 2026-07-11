@@ -13,6 +13,7 @@ from quant import (
     beta,
     daily_returns,
     max_drawdown_pct,
+    net_pnl,
     returns_frame,
     sharpe_ratio,
     total_return_pct,
@@ -142,6 +143,41 @@ def test_beta_uses_only_dates_present_in_both_series():
         [market, pd.Series([0.5], index=[pd.Timestamp("2024-02-01")])]
     )
     assert beta(asset, market_with_extra_day) == pytest.approx(expected)
+
+
+# --- net_pnl (warstwa 12a: prowizja + podatek Belka) ------------------------
+
+def test_net_pnl_gain_is_taxed_after_both_commissions():
+    # koszt 1000, dzis warte 1200: prowizja 0,29% przy kupnie I przy
+    # (hipotetycznej) sprzedazy dzis, Belka 19% dopiero od zysku PO prowizjach.
+    out = net_pnl(cost_basis=1000.0, market_value=1200.0)
+    assert out["commission_total"] == pytest.approx(6.38)
+    assert out["tax_belka"] == pytest.approx(36.79, abs=0.01)
+    assert out["net_pnl_abs"] == pytest.approx(156.83, abs=0.01)
+    assert out["net_pnl_pct"] == pytest.approx(15.68, abs=0.01)
+
+
+def test_net_pnl_loss_pays_no_belka_tax():
+    # strata nie generuje podatku - tylko prowizje obu (hipotetycznych) transakcji.
+    out = net_pnl(cost_basis=1000.0, market_value=900.0)
+    assert out["tax_belka"] == 0.0
+    assert out["net_pnl_abs"] == pytest.approx(-105.51, abs=0.01)
+    assert out["net_pnl_abs"] < (900.0 - 1000.0)  # netto gorsze niz brutto (koszty)
+
+
+def test_net_pnl_zero_cost_basis_returns_zero_pct_not_crash():
+    out = net_pnl(cost_basis=0.0, market_value=0.0)
+    assert out["net_pnl_pct"] == 0.0
+    assert out["net_pnl_abs"] == 0.0
+
+
+def test_net_pnl_custom_rates_override_defaults():
+    # prowizja=0, podatek=50% -> netto = zysk brutto / 2, bez zadnych kosztow transakcyjnych.
+    out = net_pnl(cost_basis=100.0, market_value=200.0, commission_pct=0.0, tax_pct=50.0)
+    assert out["commission_total"] == 0.0
+    assert out["tax_belka"] == pytest.approx(50.0)
+    assert out["net_pnl_abs"] == pytest.approx(50.0)
+    assert out["net_pnl_pct"] == pytest.approx(50.0)
 
 
 # --- max_drawdown_pct ------------------------------------------------------

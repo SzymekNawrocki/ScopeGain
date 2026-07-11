@@ -107,8 +107,13 @@ export type PortfolioValuation = {
   positions: PositionValuation[];
   total_cost: number;
   total_value: number;
-  total_pnl_abs: number;
-  total_pnl_pct: number;
+  total_pnl_abs: number;   // brutto
+  total_pnl_pct: number;   // brutto
+  // --- P&L netto (warstwa 12a): prowizja maklerska + podatek Belka ---
+  total_commission: number;
+  total_tax_belka: number;
+  total_pnl_net_abs: number;
+  total_pnl_net_pct: number;
 };
 
 // Dociaga aktualna wycene portfela (ceny z rynku + policzony zysk/strata).

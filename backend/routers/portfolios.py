@@ -13,6 +13,7 @@ from models import Portfolio, Position
 from quant import (
     annualized_volatility_pct,
     beta,
+    net_pnl,
     returns_frame,
     sharpe_ratio,
     total_return_pct,
@@ -106,6 +107,10 @@ def portfolio_valuation(portfolio_id: int, db: Session = Depends(get_db)):
     zysk_total = total_value - total_cost
     zysk_total_pct = (zysk_total / total_cost * 100) if total_cost else 0.0
 
+    # Ile REALNIE zostaje w kieszeni: brutto pomniejszone o prowizje maklerska
+    # i podatek Belka (patrz quant.net_pnl - warstwa 12a).
+    netto = net_pnl(total_cost, total_value)
+
     return PortfolioValuation(
         id=portfel.id,
         name=portfel.name,
@@ -114,6 +119,10 @@ def portfolio_valuation(portfolio_id: int, db: Session = Depends(get_db)):
         total_value=round(total_value, 2),
         total_pnl_abs=round(zysk_total, 2),
         total_pnl_pct=round(zysk_total_pct, 2),
+        total_commission=netto["commission_total"],
+        total_tax_belka=netto["tax_belka"],
+        total_pnl_net_abs=netto["net_pnl_abs"],
+        total_pnl_net_pct=netto["net_pnl_pct"],
     )
 
 
