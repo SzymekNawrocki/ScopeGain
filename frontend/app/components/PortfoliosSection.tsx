@@ -30,8 +30,15 @@ export function PortfoliosSection() {
         </StatusPanel>
       ) : portfolios.length === 0 ? (
         <StatusPanel variant="empty">
-          <span className="text-accent">$</span> brak portfeli — kliknij „+ nowy portfel" powyzej,
-          zeby zaczac.
+          <p>
+            <span className="text-accent">$</span> brak portfeli — kliknij{" "}
+            <span className="text-accent">„+ nowy portfel"</span> powyzej, zeby
+            zaczac.
+          </p>
+          <p className="mt-2 text-xs">
+            Potem w karcie portfela dodasz pierwsza pozycje (ticker + liczba
+            sztuk + cena), a analiza policzy sie sama.
+          </p>
         </StatusPanel>
       ) : (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
