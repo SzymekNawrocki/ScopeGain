@@ -9,7 +9,8 @@ from sqlalchemy.orm import Session
 from analysis import build_verdict
 from database import get_db
 from market import BENCHMARK, close_series, closes_frame, latest_prices
-from models import Portfolio, Position
+from models import Portfolio, Position, User
+from security import get_current_user
 from quant import (
     annualized_volatility_pct,
     beta,
@@ -36,12 +37,28 @@ BENCHMARK_LABEL = "S&P 500"
 router = APIRouter(prefix="/portfolios", tags=["portfolios"])
 
 
+def _get_owned_portfolio(portfolio_id: int, user: User, db: Session) -> Portfolio:
+    """Pobiera portfel i sprawdza, ze nalezy do zalogowanego usera. Cudzy
+    (albo osierocony sprzed auth) traktujemy jak NIEISTNIEJACY (404, nie 403) -
+    nie zdradzamy nawet, ze taki portfel istnieje. Jedno miejsce, wolane przez
+    wszystkie trasy z {portfolio_id}, wiec autoryzacji nie da sie zapomniec."""
+    portfel = db.get(Portfolio, portfolio_id)
+    if portfel is None or portfel.user_id != user.id:
+        raise HTTPException(status_code=404, detail=f"Nie ma portfela o id {portfolio_id}.")
+    return portfel
+
+
 # response_model = schemat, ktorym FastAPI FILTRUJE odpowiedz. Nawet gdy
 # obiekt z bazy ma wiecej pol, klient dostanie tylko to, co w schemacie.
 @router.post("", response_model=PortfolioRead, status_code=201)
-def create_portfolio(dane: PortfolioCreate, db: Session = Depends(get_db)):
-    # dane sa juz zwalidowane przez Pydantic (bramkarz). Tworzymy wiersz w bazie.
-    portfel = Portfolio(name=dane.name)
+def create_portfolio(
+    dane: PortfolioCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    # dane sa juz zwalidowane przez Pydantic (bramkarz). Tworzymy wiersz w bazie,
+    # przypisany do zalogowanego usera (user_id).
+    portfel = Portfolio(name=dane.name, user_id=user.id)
     db.add(portfel)       # "dopisz do sesji"
     db.commit()           # "zatwierdz w bazie" (dopiero teraz trafia na dysk)
     db.refresh(portfel)   # dociagnij id, ktore nadala baza
@@ -49,22 +66,24 @@ def create_portfolio(dane: PortfolioCreate, db: Session = Depends(get_db)):
 
 
 @router.get("", response_model=list[PortfolioRead])
-def list_portfolios(db: Session = Depends(get_db)):
-    # select(...) buduje zapytanie; scalars().all() zwraca liste obiektow.
-    return db.scalars(select(Portfolio)).all()
+def list_portfolios(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    # Tylko portfele zalogowanego usera - obcych nie widac.
+    return db.scalars(select(Portfolio).where(Portfolio.user_id == user.id)).all()
 
 
 # Zywa wycena portfela: bierze pozycje z bazy, dociaga aktualne ceny z rynku
 # i liczy zysk/strate. To pierwszy prawdziwy "quant" - laczy DANE (baza) z
 # RYNKIEM (yfinance) w policzony wynik, ktorego nie ma w zadnej tabeli.
 @router.get("/{portfolio_id}/valuation", response_model=PortfolioValuation)
-def portfolio_valuation(portfolio_id: int, db: Session = Depends(get_db)):
-    portfel = db.get(Portfolio, portfolio_id)
-    if portfel is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Nie ma portfela o id {portfolio_id}.",
-        )
+def portfolio_valuation(
+    portfolio_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    portfel = _get_owned_portfolio(portfolio_id, user, db)
 
     # Jeden strzal po ceny wszystkich spolek z portfela (nie w petli!).
     ceny = latest_prices([p.ticker for p in portfel.positions])
@@ -134,10 +153,9 @@ def portfolio_performance(
     portfolio_id: int,
     period: Literal["1mo", "3mo", "6mo", "1y", "5y"] = "6mo",
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
-    portfel = db.get(Portfolio, portfolio_id)
-    if portfel is None:
-        raise HTTPException(status_code=404, detail=f"Nie ma portfela o id {portfolio_id}.")
+    portfel = _get_owned_portfolio(portfolio_id, user, db)
     if not portfel.positions:
         raise HTTPException(status_code=400, detail="Portfel jest pusty - nie ma co liczyc.")
 
@@ -209,10 +227,9 @@ def portfolio_verdict(
     portfolio_id: int,
     period: Literal["1mo", "3mo", "6mo", "1y", "5y"] = "1y",
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
-    portfel = db.get(Portfolio, portfolio_id)
-    if portfel is None:
-        raise HTTPException(status_code=404, detail=f"Nie ma portfela o id {portfolio_id}.")
+    portfel = _get_owned_portfolio(portfolio_id, user, db)
     if not portfel.positions:
         raise HTTPException(status_code=400, detail="Portfel jest pusty - nie ma co oceniac.")
 
@@ -279,10 +296,9 @@ def portfolio_correlations(
     portfolio_id: int,
     period: Literal["1mo", "3mo", "6mo", "1y", "5y"] = "6mo",
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
-    portfel = db.get(Portfolio, portfolio_id)
-    if portfel is None:
-        raise HTTPException(status_code=404, detail=f"Nie ma portfela o id {portfolio_id}.")
+    portfel = _get_owned_portfolio(portfolio_id, user, db)
 
     tickery = sorted({p.ticker.upper() for p in portfel.positions})
     # Korelacja ma sens dopiero dla >= 2 ROZNYCH spolek.
@@ -310,15 +326,11 @@ def add_position(
     portfolio_id: int,               # z adresu: do ktorego portfela dopisujemy
     dane: PositionCreate,            # z tresci: jaka spolka, ile, po ile
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
-    # Najpierw sprawdzamy, czy portfel w ogole istnieje. Bez tego proba
-    # zapisu wybuchlaby brzydko na kluczu obcym (500). Wolimy grzeczne 404.
-    portfel = db.get(Portfolio, portfolio_id)
-    if portfel is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Nie ma portfela o id {portfolio_id}.",
-        )
+    # Portfel musi istniec I nalezec do zalogowanego usera (inaczej 404) -
+    # bez tego mozna by dopisywac pozycje do cudzego portfela.
+    portfel = _get_owned_portfolio(portfolio_id, user, db)
 
     # Walidacja rynkowa: nie wpuszczamy spolki, ktorej rynek nie zna - inaczej
     # wycena, backtest i werdykt dostana smiec (spolka bez ceny). {} = brak.
@@ -348,7 +360,10 @@ def delete_position(
     portfolio_id: int,
     position_id: int,
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
+    # Najpierw autoryzacja portfela (cudzy -> 404), potem czy pozycja jest jego.
+    _get_owned_portfolio(portfolio_id, user, db)
     pozycja = db.get(Position, position_id)
     if pozycja is None or pozycja.portfolio_id != portfolio_id:
         raise HTTPException(status_code=404, detail="Nie ma takiej pozycji w tym portfelu.")
@@ -359,9 +374,11 @@ def delete_position(
 # Usuwanie calego portfela. Pozycje znikaja same dzieki cascade="all,
 # delete-orphan" na relacji w models.py (baza sprzata dzieci za nas).
 @router.delete("/{portfolio_id}", status_code=204)
-def delete_portfolio(portfolio_id: int, db: Session = Depends(get_db)):
-    portfel = db.get(Portfolio, portfolio_id)
-    if portfel is None:
-        raise HTTPException(status_code=404, detail=f"Nie ma portfela o id {portfolio_id}.")
+def delete_portfolio(
+    portfolio_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    portfel = _get_owned_portfolio(portfolio_id, user, db)
     db.delete(portfel)
     db.commit()

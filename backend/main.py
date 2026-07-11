@@ -3,7 +3,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import portfolios, stock
+from routers import auth, portfolios, stock
 
 app = FastAPI(title="ScopeGain API")
 
@@ -30,5 +30,6 @@ def health():
 
 # Wpinamy routery (mini-aplikacje) do glownej apki. main.py nie musi juz
 # znac szczegolow tras - kazdy obszar mieszka we wlasnym pliku w routers/.
+app.include_router(auth.router)
 app.include_router(stock.router)
 app.include_router(portfolios.router)

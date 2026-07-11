@@ -1,3 +1,5 @@
+import { AuthStatus } from "./AuthStatus";
+
 // Przyklejony pasek nawigacji. Linki to zwykle kotwice (#portfele...) -
 // dzialaja bez JS, a plynne przewijanie zalatwia scroll-behavior w globals.css.
 const LINKS: [string, string][] = [
@@ -16,16 +18,20 @@ export function Nav() {
         >
           Scope<span className="text-accent">Gain</span>
         </a>
-        <div className="ml-auto flex gap-1">
-          {LINKS.map(([id, label]) => (
-            <a
-              key={id}
-              href={`#${id}`}
-              className="cyber-chamfer-sm border border-transparent px-3 py-1.5 font-mono text-sm uppercase tracking-wider text-muted-foreground transition-all hover:border-accent hover:text-accent"
-            >
-              {label}
-            </a>
-          ))}
+        <div className="ml-auto flex items-center gap-4">
+          <div className="flex gap-1">
+            {LINKS.map(([id, label]) => (
+              <a
+                key={id}
+                href={`#${id}`}
+                className="cyber-chamfer-sm border border-transparent px-3 py-1.5 font-mono text-sm uppercase tracking-wider text-muted-foreground transition-all hover:border-accent hover:text-accent"
+              >
+                {label}
+              </a>
+            ))}
+          </div>
+          {/* Kto zalogowany + wyloguj (klientowy, czyta AuthProvider) */}
+          <AuthStatus />
         </div>
       </div>
     </nav>

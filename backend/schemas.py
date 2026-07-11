@@ -7,6 +7,23 @@ from pydantic import BaseModel, Field
 # ------------------------------------------------------------------------
 
 
+# --- AUTH (warstwa 5) ---
+
+# Rejestracja/logowanie: to, co klient PRZYSYLA. Haslo min. 8 znakow -
+# prosta bariera; Pydantic odrzuci krotsze, zanim dotkniemy bazy.
+class UserCredentials(BaseModel):
+    email: str = Field(min_length=3, max_length=255)
+    password: str = Field(min_length=8, max_length=128)
+
+
+# To, co ODDAJEMY: nigdy hasla ani hasha - tylko id i email.
+class UserRead(BaseModel):
+    id: int
+    email: str
+
+    model_config = {"from_attributes": True}
+
+
 # --- POZYCJA ---
 
 # To, co klient PRZYSYLA, tworzac pozycje. Brak "id" i "portfolio_id" -

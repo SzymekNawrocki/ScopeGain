@@ -2,6 +2,9 @@ import { MarketScope } from "./components/MarketScope";
 import { PortfoliosProvider } from "./components/PortfoliosProvider";
 import { PortfoliosSection } from "./components/PortfoliosSection";
 import { AnalysisSection } from "./components/AnalysisSection";
+import { HowItWorks } from "./components/HowItWorks";
+import { AuthProvider } from "./components/AuthProvider";
+import { AuthGate } from "./components/AuthGate";
 import { Nav } from "./components/Nav";
 import { SectionLabel } from "./components/ui/SectionLabel";
 
@@ -13,7 +16,9 @@ import { SectionLabel } from "./components/ui/SectionLabel";
 // bo sa przekazane jako zwykle dzieci/elementy, a nie zdefiniowane wewnatrz Providera.
 export default function Dashboard() {
   return (
-    <>
+    // AuthProvider obejmuje pasek I tresc - dzieki temu i AuthStatus (w pasku),
+    // i AuthGate (nizej) czytaja ten sam stan zalogowania.
+    <AuthProvider>
       <Nav />
       <main id="top" className="mx-auto max-w-7xl px-6 py-12">
         {/* NAGLOWEK */}
@@ -25,31 +30,38 @@ export default function Dashboard() {
             ScopeGain
           </h1>
           <p className="mt-4 max-w-xl font-mono text-base leading-relaxed text-muted-foreground">
-            Terminal analizy portfela. Dane na zywo z lokalnego API.
+            Dodaj spolki, ktore masz, a apka policzy Twoj realny zysk i ryzyko —
+            na zywo z rynku.
             <span className="cursor-blink" />
           </p>
         </header>
 
-        <PortfoliosProvider>
-          {/* PORTFELE - Twoje holdingi + P&L (najpierw, bo to Twoje dane) */}
-          <section id="portfele" className="mb-16 scroll-mt-20">
-            <SectionLabel>./portfolios --list</SectionLabel>
-            <PortfoliosSection />
-          </section>
+        {/* Brama: niezalogowany widzi ekran logowania; reszta renderuje sie
+            (i odpytuje chronione API) dopiero po zalogowaniu. */}
+        <AuthGate>
+          <HowItWorks />
 
-          {/* RYNEK - research dowolnej spolki (swiece + metryki), niezalezny stan */}
-          <section id="rynek" className="scroll-mt-20">
-            <SectionLabel>./market --scope</SectionLabel>
-            <MarketScope />
-          </section>
+          <PortfoliosProvider>
+            {/* PORTFELE - Twoje holdingi + P&L (najpierw, bo to Twoje dane) */}
+            <section id="portfele" className="mb-16 scroll-mt-20">
+              <SectionLabel>./portfolios --list</SectionLabel>
+              <PortfoliosSection />
+            </section>
 
-          {/* ANALIZA - werdykt, backtest vs rynek, ryzyko, korelacje */}
-          <section id="analiza" className="mt-16 scroll-mt-20">
-            <SectionLabel>./portfolio --analyze</SectionLabel>
-            <AnalysisSection />
-          </section>
-        </PortfoliosProvider>
+            {/* RYNEK - research dowolnej spolki (swiece + metryki), niezalezny stan */}
+            <section id="rynek" className="scroll-mt-20">
+              <SectionLabel>./market --scope</SectionLabel>
+              <MarketScope />
+            </section>
+
+            {/* ANALIZA - werdykt, backtest vs rynek, ryzyko, korelacje */}
+            <section id="analiza" className="mt-16 scroll-mt-20">
+              <SectionLabel>./portfolio --analyze</SectionLabel>
+              <AnalysisSection />
+            </section>
+          </PortfoliosProvider>
+        </AuthGate>
       </main>
-    </>
+    </AuthProvider>
   );
 }

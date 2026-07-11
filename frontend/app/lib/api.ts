@@ -16,6 +16,14 @@ export type Portfolio = {
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
+// Jedno wejscie do API dla calej apki. credentials: "include" KAZE przegladarce
+// dolaczyc httpOnly cookie z tokenem - bez tego cross-origin (3000 -> 8000)
+// ciasteczko nie leci i chronione trasy oddaja 401. Trzymanie tego w jednym
+// miejscu = nie da sie zapomniec w zadnym z kilkunastu fetchy nizej.
+function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  return fetch(`${API_BASE}${path}`, { ...init, credentials: "include" });
+}
+
 // Wyciaga czytelny komunikat bledu z odpowiedzi API (pole "detail" od FastAPI).
 async function apiError(res: Response): Promise<string> {
   try {
@@ -27,10 +35,56 @@ async function apiError(res: Response): Promise<string> {
   return `API zwrocilo ${res.status}`;
 }
 
+// --- Auth (warstwa 5) ---
+export type User = { id: number; email: string };
+
+// Rzucany, gdy API mowi 401 (brak/wygasle cookie). Front lapie go i pokazuje
+// ekran logowania zamiast traktowac to jak zwykla awarie.
+export class UnauthorizedError extends Error {
+  constructor() {
+    super("Nie zalogowano.");
+    this.name = "UnauthorizedError";
+  }
+}
+
+export async function register(email: string, password: string): Promise<User> {
+  const res = await apiFetch("/auth/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) throw new Error(await apiError(res));
+  return res.json();
+}
+
+export async function login(email: string, password: string): Promise<User> {
+  const res = await apiFetch("/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) throw new Error(await apiError(res));
+  return res.json();
+}
+
+export async function logout(): Promise<void> {
+  await apiFetch("/auth/logout", { method: "POST" });
+}
+
+// Kim jestem? Zwraca usera albo null (gdy 401 = niezalogowany). Front wola to
+// na starcie, zeby zdecydowac: dashboard czy ekran logowania.
+export async function getMe(): Promise<User | null> {
+  const res = await apiFetch("/auth/me");
+  if (res.status === 401) return null;
+  if (!res.ok) throw new Error(await apiError(res));
+  return res.json();
+}
+
 // Pobiera liste portfeli. fetch leci Z PRZEGLADARKI - dlatego backend musi
 // miec wlaczone CORS, inaczej przegladarka zablokuje odpowiedz.
 export async function getPortfolios(): Promise<Portfolio[]> {
-  const res = await fetch(`${API_BASE}/portfolios`);
+  const res = await apiFetch("/portfolios");
+  if (res.status === 401) throw new UnauthorizedError();
   if (!res.ok) {
     throw new Error(await apiError(res));
   }
@@ -40,7 +94,7 @@ export async function getPortfolios(): Promise<Portfolio[]> {
 // --- Mutacje: tworzenie i kasowanie (zarzadzanie wlasnymi danymi z UI) ---
 
 export async function createPortfolio(name: string): Promise<Portfolio> {
-  const res = await fetch(`${API_BASE}/portfolios`, {
+  const res = await apiFetch(`/portfolios`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
@@ -53,7 +107,7 @@ export async function addPosition(
   portfolioId: number,
   pos: { ticker: string; quantity: number; buy_price: number },
 ): Promise<Position> {
-  const res = await fetch(`${API_BASE}/portfolios/${portfolioId}/positions`, {
+  const res = await apiFetch(`/portfolios/${portfolioId}/positions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(pos),
@@ -66,15 +120,15 @@ export async function deletePosition(
   portfolioId: number,
   positionId: number,
 ): Promise<void> {
-  const res = await fetch(
-    `${API_BASE}/portfolios/${portfolioId}/positions/${positionId}`,
+  const res = await apiFetch(
+    `/portfolios/${portfolioId}/positions/${positionId}`,
     { method: "DELETE" },
   );
   if (!res.ok) throw new Error(await apiError(res));
 }
 
 export async function deletePortfolio(portfolioId: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/portfolios/${portfolioId}`, {
+  const res = await apiFetch(`/portfolios/${portfolioId}`, {
     method: "DELETE",
   });
   if (!res.ok) throw new Error(await apiError(res));
@@ -120,7 +174,7 @@ export type PortfolioValuation = {
 export async function getPortfolioValuation(
   id: number,
 ): Promise<PortfolioValuation> {
-  const res = await fetch(`${API_BASE}/portfolios/${id}/valuation`);
+  const res = await apiFetch(`/portfolios/${id}/valuation`);
   if (!res.ok) {
     throw new Error(`API zwrocilo ${res.status}`);
   }
@@ -163,7 +217,7 @@ export async function getPortfolioPerformance(
   id: number,
   period: Period = "6mo",
 ): Promise<PortfolioPerformance> {
-  const res = await fetch(`${API_BASE}/portfolios/${id}/performance?period=${period}`);
+  const res = await apiFetch(`/portfolios/${id}/performance?period=${period}`);
   if (!res.ok) {
     throw new Error(`API zwrocilo ${res.status}`);
   }
@@ -192,7 +246,7 @@ export async function getPortfolioVerdict(
   id: number,
   period: Period = "1y",
 ): Promise<PortfolioVerdict> {
-  const res = await fetch(`${API_BASE}/portfolios/${id}/verdict?period=${period}`);
+  const res = await apiFetch(`/portfolios/${id}/verdict?period=${period}`);
   if (!res.ok) {
     throw new Error(`API zwrocilo ${res.status}`);
   }
@@ -211,7 +265,7 @@ export async function getPortfolioCorrelations(
   id: number,
   period: Period = "6mo",
 ): Promise<PortfolioCorrelations> {
-  const res = await fetch(`${API_BASE}/portfolios/${id}/correlations?period=${period}`);
+  const res = await apiFetch(`/portfolios/${id}/correlations?period=${period}`);
   if (!res.ok) {
     throw new Error(`API zwrocilo ${res.status}`);
   }
@@ -255,8 +309,8 @@ export async function getStockMetrics(
   ticker: string,
   period: Period = "6mo",
 ): Promise<StockMetrics> {
-  const res = await fetch(
-    `${API_BASE}/stock/${encodeURIComponent(ticker)}/metrics?period=${period}`,
+  const res = await apiFetch(
+    `/stock/${encodeURIComponent(ticker)}/metrics?period=${period}`,
   );
   if (!res.ok) {
     throw new Error(`API zwrocilo ${res.status}`);
@@ -269,8 +323,8 @@ export async function getStockHistory(
   ticker: string,
   period: Period = "6mo",
 ): Promise<StockHistory> {
-  const res = await fetch(
-    `${API_BASE}/stock/${encodeURIComponent(ticker)}/history?period=${period}`,
+  const res = await apiFetch(
+    `/stock/${encodeURIComponent(ticker)}/history?period=${period}`,
   );
   if (!res.ok) {
     if (res.status === 404) {
