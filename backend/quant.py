@@ -112,6 +112,64 @@ def net_pnl(
     }
 
 
+# --- Warstwa ryzyka: VaR / CVaR / stress test ------------------------------
+# VaR = "jak duzo moge stracic w normalnie zly dzien/miesiac". CVaR = "a jak
+# JUZ jest zle (poza VaR), to srednio ile". Liczymy METODA HISTORYCZNA: bez
+# zalozenia rozkladu normalnego - bierzemy realne zwroty portfela, wiec grube
+# ogony rynku (krachy) sa w danych, a nie wygladzone przez ladny wzor.
+
+def historical_var_pct(returns: pd.Series, confidence: float = 0.95) -> float:
+    """VaR historyczny: kwantyl (1 - confidence) rozkladu dziennych zwrotow.
+
+    Dla confidence=0.95 bierzemy 5. percentyl realnych zwrotow - prog, ponizej
+    ktorego ląduje najgorsze 5% dni. Zwracamy jako % (liczba UJEMNA: strata).
+    "Z 95% pewnoscia dzienny wynik nie bedzie gorszy niz ta liczba."
+    """
+    if returns.empty:
+        return 0.0
+    return float(returns.quantile(1 - confidence) * 100)
+
+
+def cvar_pct(returns: pd.Series, confidence: float = 0.95) -> float:
+    """CVaR (expected shortfall): srednia zwrotow GORSZYCH niz prog VaR.
+
+    VaR mowi "gdzie zaczyna sie ogon", CVaR "jak gleboki jest ten ogon srednio"
+    - dlatego dokladamy go do VaR, ktory sam usypia ("95% OK" nie mowi, co w tych
+    5%). Liczba ujemna, zwykle gorsza (nizsza) niz VaR.
+    """
+    if returns.empty:
+        return 0.0
+    prog = returns.quantile(1 - confidence)
+    ogon = returns[returns <= prog]
+    if ogon.empty:                      # skrajnie krotka seria - brak ogona
+        return float(prog * 100)
+    return float(ogon.mean() * 100)
+
+
+def overlapping_horizon_returns(returns: pd.Series, window: int = 21) -> pd.Series:
+    """Nakladajace sie skumulowane zwroty z okna N dni (np. 21 = ~miesiac).
+
+    Do VaR dluzszego niz 1 dzien. Uczciwiej niz mnozenie dziennego VaR przez
+    sqrt(N) - to skalowanie zaklada niezalezne, normalne zwroty; rynek takich
+    nie ma. Tu skladamy REALNE ciagi N kolejnych dni: (1+r).rolling(N).prod()-1.
+    """
+    if len(returns) < window:
+        return pd.Series(dtype=float)
+    skumulowane = (1 + returns).rolling(window).apply(np.prod, raw=True) - 1
+    return skumulowane.dropna()
+
+
+def portfolio_shock_pct(weights: dict[str, float], shocks: dict[str, float]) -> float:
+    """Uderzenie w portfel = suma (waga spolki * jej szok) w %.
+
+    Czysta arytmetyka stress testu: wagi (udzialy sumujace sie do 1) i szoki
+    (zwrot spolki w oknie krachu, np. -0.55) na wejsciu, laczny procentowy
+    spadek portfela na wyjsciu. Skad biora sie szoki (realna historia czy
+    proxy przez bete) rozstrzyga warstwa wyzej - tu tylko liczymy.
+    """
+    return float(sum(weights[t] * shocks[t] for t in weights) * 100)
+
+
 def max_drawdown_pct(close: pd.Series) -> float:
     """Najwieksze obsuniecie od szczytu do pozniejszego dolka (liczba ujemna).
 

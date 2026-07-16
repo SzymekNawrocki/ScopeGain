@@ -253,6 +253,124 @@ export async function getPortfolioVerdict(
   return res.json();
 }
 
+// --- Ryzyko: VaR / CVaR / stress test (ile realnie moge stracic) ---
+// Ksztalt 1:1 ze schematami PortfolioRisk / VarMeasure / StressScenario.
+// Apka NIE prognozuje - VaR to percentyl REALNYCH zwrotow, stress to
+// odtworzenie realnych krachow. Kwoty w USD (spolki w dolarach).
+
+export const RISK_WINDOWS = ["1y", "2y", "5y"] as const;
+export type RiskWindow = (typeof RISK_WINDOWS)[number];
+
+export type VarMeasure = {
+  confidence: number; // 0.95 / 0.99
+  horizon: string; // "1d" / "1m"
+  var_pct: number; // ujemny: strata
+  var_abs: number; // w walucie portfela
+  cvar_pct: number; // srednia strata poza VaR (ogon)
+  cvar_abs: number;
+};
+
+export type StressScenario = {
+  key: string;
+  label: string;
+  shock_pct: number; // laczne uderzenie w portfel (ujemne)
+  pnl_abs: number;
+  coverage_real: string[]; // spolki z realnych danych z krachu
+  coverage_proxy: string[]; // spolki przez proxy (beta x indeks)
+};
+
+export type PortfolioRiskReport = {
+  id: number;
+  name: string;
+  window: string;
+  currency: string; // "USD"
+  portfolio_value: number;
+  n_days: number;
+  var: VarMeasure[];
+  stress: StressScenario[];
+  warning: string | null;
+};
+
+export async function getPortfolioRisk(
+  id: number,
+  window: RiskWindow = "2y",
+): Promise<PortfolioRiskReport> {
+  const res = await apiFetch(`/portfolios/${id}/risk?window=${window}`);
+  if (!res.ok) {
+    throw new Error(await apiError(res));
+  }
+  return res.json();
+}
+
+// --- Transakcje + werdykt zachowania (warstwa 12b: behavior gap) ---
+// Pozycja = "co mam teraz"; transakcja = "co zrobilem i kiedy". Log sprzedazy
+// pozwala apce ocenic timing (czy sprzedales za wczesnie zwycieska spolke).
+
+export type TransactionSide = "BUY" | "SELL";
+
+export type Transaction = {
+  id: number;
+  ticker: string;
+  side: string; // "BUY" / "SELL"
+  quantity: number;
+  price: number;
+  executed_at: string; // "YYYY-MM-DD"
+};
+
+export async function getTransactions(portfolioId: number): Promise<Transaction[]> {
+  const res = await apiFetch(`/portfolios/${portfolioId}/transactions`);
+  if (!res.ok) throw new Error(await apiError(res));
+  return res.json();
+}
+
+export async function addTransaction(
+  portfolioId: number,
+  tx: {
+    ticker: string;
+    side: TransactionSide;
+    quantity: number;
+    price: number;
+    executed_at: string;
+  },
+): Promise<Transaction> {
+  const res = await apiFetch(`/portfolios/${portfolioId}/transactions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(tx),
+  });
+  if (!res.ok) throw new Error(await apiError(res));
+  return res.json();
+}
+
+export async function deleteTransaction(
+  portfolioId: number,
+  transactionId: number,
+): Promise<void> {
+  const res = await apiFetch(
+    `/portfolios/${portfolioId}/transactions/${transactionId}`,
+    { method: "DELETE" },
+  );
+  if (!res.ok) throw new Error(await apiError(res));
+}
+
+// Werdykt zachowania: findings maja ten sam ksztalt co werdykt portfela
+// (severity/title/detail), plus laczne "zostawione na stole" i uczciwy caveat.
+export type BehaviorVerdict = {
+  id: number;
+  name: string;
+  grade: Severity;
+  grade_label: string;
+  total_left_on_table: number; // + = trzymanie byloby lepsze; - = dobre wyjscia
+  caveat: string;
+  findings: VerdictFinding[];
+};
+
+export async function getPortfolioBehavior(id: number): Promise<BehaviorVerdict> {
+  const res = await apiFetch(`/portfolios/${id}/behavior`);
+  if (!res.ok) throw new Error(await apiError(res));
+  return res.json();
+}
+
 // --- Korelacje miedzy spolkami w portfelu (warstwa 6d) ---
 // matrix[i][j] = korelacja spolki tickers[i] z tickers[j] (od -1 do 1).
 export type PortfolioCorrelations = {

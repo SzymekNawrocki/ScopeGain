@@ -6,27 +6,43 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from analysis import build_verdict
+from analysis import build_behavior_verdict, build_verdict
 from database import get_db
-from market import BENCHMARK, close_series, closes_frame, latest_prices
-from models import Portfolio, Position, User
+from market import (
+    BENCHMARK,
+    CRASH_WINDOWS,
+    close_series,
+    close_series_range,
+    closes_frame,
+    latest_prices,
+)
+from models import Portfolio, Position, Transaction, User
 from security import get_current_user
 from quant import (
     annualized_volatility_pct,
     beta,
+    cvar_pct,
+    historical_var_pct,
+    max_drawdown_pct,
     net_pnl,
+    overlapping_horizon_returns,
+    portfolio_shock_pct,
     returns_frame,
     sharpe_ratio,
-    total_return_pct,
 )
 
 from schemas import (
     PortfolioCreate,
     PortfolioRead,
+    PortfolioRisk,
     PortfolioValuation,
     PositionCreate,
     PositionRead,
     PositionValuation,
+    StressScenario,
+    TransactionCreate,
+    TransactionRead,
+    VarMeasure,
 )
 
 # Ludzka nazwa benchmarku do komunikatow (SPY = ETF na S&P 500).
@@ -46,6 +62,31 @@ def _get_owned_portfolio(portfolio_id: int, user: User, db: Session) -> Portfoli
     if portfel is None or portfel.user_id != user.id:
         raise HTTPException(status_code=404, detail=f"Nie ma portfela o id {portfolio_id}.")
     return portfel
+
+
+def _quantities_by_ticker(positions: list[Position]) -> dict[str, float]:
+    """Sumuje ilosci per ticker (ten sam ticker moze byc w kilku pozycjach)."""
+    ilosci: dict[str, float] = defaultdict(float)
+    for p in positions:
+        ilosci[p.ticker.upper()] += float(p.quantity)
+    return dict(ilosci)
+
+
+def _portfolio_value_series(positions: list[Position], ceny: pd.DataFrame) -> pd.Series:
+    """Wartosc portfela dzien po dniu = suma (ilosc * cena) po pozycjach.
+
+    JEDNO miejsce prawdy dla "krzywej portfela" - wczesniej ten sam wzor byl
+    powielony w performance i verdict. UWAGA: bierze DZISIEJSZE ilosci i rzutuje
+    je na caly okres (brak logu transakcji, warstwa 12b) - to hipoteza "gdybym
+    od poczatku trzymal to, co mam dzis", nie realna sciezka. Front oznacza to
+    jako "hipotetyczny".
+    """
+    ilosci = _quantities_by_ticker(positions)
+    wartosc = pd.Series(0.0, index=ceny.index)
+    for t, q in ilosci.items():
+        if t in ceny.columns:
+            wartosc = wartosc + q * ceny[t]
+    return wartosc
 
 
 # response_model = schemat, ktorym FastAPI FILTRUJE odpowiedz. Nawet gdy
@@ -164,12 +205,8 @@ def portfolio_performance(
     if ceny.empty:
         raise HTTPException(status_code=404, detail="Brak danych rynkowych dla tego portfela.")
 
-    # Wartosc portfela w kazdym dniu = suma (ilosc * cena) po pozycjach.
-    wartosc = pd.Series(0.0, index=ceny.index)
-    for p in portfel.positions:
-        kol = p.ticker.upper()
-        if kol in ceny.columns:
-            wartosc = wartosc + float(p.quantity) * ceny[kol]
+    # Wartosc portfela w kazdym dniu (helper - jedno miejsce prawdy).
+    wartosc = _portfolio_value_series(portfel.positions, ceny)
 
     # Indeks od 100: kazdy punkt to "ile masz, jesli start = 100". Pozwala
     # porownac portfel i rynek na jednej skali, niezaleznie od kwot.
@@ -234,9 +271,7 @@ def portfolio_verdict(
         raise HTTPException(status_code=400, detail="Portfel jest pusty - nie ma co oceniac.")
 
     # Sumujemy ilosci per ticker (ten sam ticker moze byc w kilku pozycjach).
-    ilosci: dict[str, float] = defaultdict(float)
-    for p in portfel.positions:
-        ilosci[p.ticker.upper()] += float(p.quantity)
+    ilosci = _quantities_by_ticker(portfel.positions)
 
     ceny = closes_frame(list(ilosci.keys()), period)
     if ceny.empty:
@@ -244,10 +279,8 @@ def portfolio_verdict(
 
     tickery = list(ceny.columns)
 
-    # Wartosc portfela dzien po dniu -> zwroty, zmiennosc, Sharpe.
-    wartosc = pd.Series(0.0, index=ceny.index)
-    for t in tickery:
-        wartosc = wartosc + ilosci[t] * ceny[t]
+    # Wartosc portfela dzien po dniu -> zwroty, zmiennosc, Sharpe (helper).
+    wartosc = _portfolio_value_series(portfel.positions, ceny)
     port_idx = wartosc / wartosc.iloc[0] * 100
     port_ret = port_idx.pct_change().dropna()
     port_zwrot = float(port_idx.iloc[-1] - 100)
@@ -286,6 +319,223 @@ def portfolio_verdict(
     )
 
     return {"id": portfel.id, "name": portfel.name, "period": period, **werdykt}
+
+
+# RYZYKO: "ile realnie moge stracic". VaR/CVaR (metoda historyczna) + stress
+# test (odtworzenie krachow). Apka NIE prognozuje - odtwarza realny rozklad i
+# realna historie. Kwoty w USD (spolki w dolarach - nie udajemy PLN).
+@router.get("/{portfolio_id}/risk", response_model=PortfolioRisk)
+def portfolio_risk(
+    portfolio_id: int,
+    window: Literal["1y", "2y", "5y"] = "2y",
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    portfel = _get_owned_portfolio(portfolio_id, user, db)
+    if not portfel.positions:
+        raise HTTPException(status_code=400, detail="Portfel jest pusty - nie ma czego liczyc.")
+
+    ilosci = _quantities_by_ticker(portfel.positions)
+
+    # Dzisiejsza wartosc i wagi - baza dla kwot ryzyka (tylko spolki z cena).
+    ceny_teraz = latest_prices(list(ilosci.keys()))
+    wartosci_dzis = {t: ilosci[t] * cena for t, cena in ceny_teraz.items()}
+    portfolio_value = sum(wartosci_dzis.values())
+    if portfolio_value <= 0:
+        raise HTTPException(status_code=404, detail="Brak aktualnych cen dla tego portfela.")
+    wagi = {t: v / portfolio_value for t, v in wartosci_dzis.items()}
+
+    # Szereg dziennych zwrotow portfela z okna estymacji (helper - ta sama
+    # krzywa co backtest, wiec VaR liczy sie ze spojnego zrodla).
+    ceny = closes_frame(list(ilosci.keys()), window)
+    if ceny.empty:
+        raise HTTPException(status_code=404, detail="Brak danych rynkowych dla tego portfela.")
+    port_idx = _portfolio_value_series(portfel.positions, ceny)
+    port_ret = port_idx.pct_change().dropna()
+    mies_ret = overlapping_horizon_returns(port_ret, window=21)
+
+    # VaR/CVaR dla 95%/99% w dwoch horyzontach (dzien / ~miesiac). Miesieczny
+    # z nakladajacych sie okien, nie ze skalowania sqrt(21).
+    var_out: list[VarMeasure] = []
+    for conf in (0.95, 0.99):
+        for horyzont, seria in (("1d", port_ret), ("1m", mies_ret)):
+            if seria.empty:
+                continue
+            v_pct = historical_var_pct(seria, conf)
+            c_pct = cvar_pct(seria, conf)
+            var_out.append(VarMeasure(
+                confidence=conf,
+                horizon=horyzont,
+                var_pct=round(v_pct, 2),
+                var_abs=round(v_pct / 100 * portfolio_value, 2),
+                cvar_pct=round(c_pct, 2),
+                cvar_abs=round(c_pct / 100 * portfolio_value, 2),
+            ))
+
+    # Bety spolek vs rynek (do proxy w stressie): z tego samego okna estymacji.
+    ret_frame = returns_frame(ceny)
+    bench_ret_window = close_series(BENCHMARK, window).pct_change().dropna()
+    bety = {
+        t: beta(ret_frame[t], bench_ret_window)
+        for t in wagi if t in ret_frame.columns
+    }
+
+    # Stress test: dla kazdego krachu licz szok kazdej spolki. Realny zwrot,
+    # jesli spolka wtedy istniala; inaczej PROXY = beta * spadek indeksu.
+    # Pokrycie (realne vs proxy) raportujemy jawnie - to o uczciwosc.
+    stress_out: list[StressScenario] = []
+    for key, okno in CRASH_WINDOWS.items():
+        spy_okno = close_series_range(BENCHMARK, okno["start"], okno["end"])
+        spy_shock = float(spy_okno.iloc[-1] / spy_okno.iloc[0] - 1) if len(spy_okno) >= 2 else 0.0
+
+        szoki: dict[str, float] = {}
+        real, proxy = [], []
+        for t in wagi:
+            seria_t = close_series_range(t, okno["start"], okno["end"])
+            if len(seria_t) >= 2:
+                szoki[t] = float(seria_t.iloc[-1] / seria_t.iloc[0] - 1)
+                real.append(t)
+            else:
+                szoki[t] = bety.get(t, 1.0) * spy_shock   # proxy przez bete
+                proxy.append(t)
+
+        shock_pct = portfolio_shock_pct(wagi, szoki)
+        stress_out.append(StressScenario(
+            key=key,
+            label=okno["label"],
+            shock_pct=round(shock_pct, 2),
+            pnl_abs=round(shock_pct / 100 * portfolio_value, 2),
+            coverage_real=sorted(real),
+            coverage_proxy=sorted(proxy),
+        ))
+
+    # Ostrzezenie o oknie: jesli w oknie estymacji nie bylo prawdziwego obsuniecia,
+    # VaR (uczony na spokojnym rynku) prawie na pewno zanizy ryzyko.
+    max_dd = max_drawdown_pct(port_idx)
+    warning = None
+    if max_dd > -15:
+        warning = (
+            f"Okno '{window}' obejmuje glownie spokojny rynek (najwieksze obsuniecie "
+            f"{max_dd:.0f}%) - VaR uczony na takim oknie zanizy ryzyko realnego krachu. "
+            f"Patrz stress test ponizej."
+        )
+
+    return PortfolioRisk(
+        id=portfel.id,
+        name=portfel.name,
+        window=window,
+        currency="USD",
+        portfolio_value=round(portfolio_value, 2),
+        n_days=int(len(port_ret)),
+        var=var_out,
+        stress=stress_out,
+        warning=warning,
+    )
+
+
+# --- TRANSAKCJE + WERDYKT ZACHOWANIA (warstwa 12b) ---
+# Pozycje mowia "co mam TERAZ". Log transakcji pamieta "co ZROBILEM i KIEDY" -
+# bez tego apka nie zna Twoich decyzji, a werdykt zachowania (behavior gap) nie
+# mialby na czym stanac. Append-only: nie edytujemy historii, tylko dopisujemy.
+
+@router.post(
+    "/{portfolio_id}/transactions",
+    response_model=TransactionRead,
+    status_code=201,
+)
+def add_transaction(
+    portfolio_id: int,
+    dane: TransactionCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    portfel = _get_owned_portfolio(portfolio_id, user, db)
+
+    # Walidacja rynkowa: nieznany ticker -> werdykt zachowania nie dociagnie
+    # dzisiejszej ceny i cala transakcja bylaby bezuzyteczna do oceny.
+    if not latest_prices([dane.ticker]):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Nie znaleziono spolki '{dane.ticker.upper()}' na rynku. Sprawdz symbol.",
+        )
+
+    tx = Transaction(
+        ticker=dane.ticker.upper(),
+        side=dane.side,               # Pydantic Literal juz ograniczyl do BUY/SELL
+        quantity=dane.quantity,
+        price=dane.price,
+        executed_at=dane.executed_at,
+        portfolio_id=portfolio_id,
+    )
+    db.add(tx)
+    db.commit()
+    db.refresh(tx)
+    return tx
+
+
+@router.get("/{portfolio_id}/transactions", response_model=list[TransactionRead])
+def list_transactions(
+    portfolio_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    _get_owned_portfolio(portfolio_id, user, db)
+    # Najnowsze na gorze (po dacie, potem po id - stabilnie przy tej samej dacie).
+    return db.scalars(
+        select(Transaction)
+        .where(Transaction.portfolio_id == portfolio_id)
+        .order_by(Transaction.executed_at.desc(), Transaction.id.desc())
+    ).all()
+
+
+@router.delete("/{portfolio_id}/transactions/{transaction_id}", status_code=204)
+def delete_transaction(
+    portfolio_id: int,
+    transaction_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    _get_owned_portfolio(portfolio_id, user, db)
+    tx = db.get(Transaction, transaction_id)
+    if tx is None or tx.portfolio_id != portfolio_id:
+        raise HTTPException(status_code=404, detail="Nie ma takiej transakcji w tym portfelu.")
+    db.delete(tx)
+    db.commit()
+
+
+# WERDYKT ZACHOWANIA: czy sprzedaze mialy dobry timing? Dla kazdej SPRZEDAZY
+# porownuje cene sprzedazy z dzisiejsza cena tej spolki (urosla -> za wczesnie).
+# Atakuje behavior gap - #1 przyczyne niedowazenia wyniku rynku (DALBAR).
+@router.get("/{portfolio_id}/behavior")
+def portfolio_behavior(
+    portfolio_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    portfel = _get_owned_portfolio(portfolio_id, user, db)
+
+    sprzedaze = db.scalars(
+        select(Transaction)
+        .where(Transaction.portfolio_id == portfolio_id, Transaction.side == "SELL")
+        .order_by(Transaction.executed_at.desc())
+    ).all()
+
+    # Jeden strzal po dzisiejsze ceny sprzedanych spolek (do porownania z cena
+    # sprzedazy). Spolki bez ceny werdykt sam pominie.
+    ceny = latest_prices([t.ticker for t in sprzedaze]) if sprzedaze else {}
+    rows = [
+        {
+            "ticker": t.ticker,
+            "quantity": float(t.quantity),
+            "sold_price": float(t.price),
+            "current_price": ceny.get(t.ticker.upper()),
+            "executed_at": t.executed_at.isoformat(),
+        }
+        for t in sprzedaze
+    ]
+
+    werdykt = build_behavior_verdict(rows)
+    return {"id": portfel.id, "name": portfel.name, **werdykt}
 
 
 # Korelacje miedzy spolkami w portfelu (na dziennych zwrotach).

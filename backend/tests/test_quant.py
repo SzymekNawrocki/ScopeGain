@@ -11,9 +11,13 @@ import pytest
 from quant import (
     annualized_volatility_pct,
     beta,
+    cvar_pct,
     daily_returns,
+    historical_var_pct,
     max_drawdown_pct,
     net_pnl,
+    overlapping_horizon_returns,
+    portfolio_shock_pct,
     returns_frame,
     sharpe_ratio,
     total_return_pct,
@@ -178,6 +182,70 @@ def test_net_pnl_custom_rates_override_defaults():
     assert out["tax_belka"] == pytest.approx(50.0)
     assert out["net_pnl_abs"] == pytest.approx(50.0)
     assert out["net_pnl_pct"] == pytest.approx(50.0)
+
+
+# --- historical_var_pct / cvar_pct (warstwa ryzyka) ------------------------
+
+def test_historical_var_is_the_low_percentile_of_returns():
+    # 100 zwrotow: -100 do -1 (procentowo -1.00 do -0.01). 5. percentyl (VaR 95%)
+    # to okolice -0.95. Sprawdzamy wprost kwantyl, ktory liczy funkcja.
+    returns = pd.Series([-i / 100 for i in range(1, 101)])
+    expected = returns.quantile(0.05) * 100
+    assert historical_var_pct(returns, confidence=0.95) == pytest.approx(expected)
+
+
+def test_higher_confidence_gives_worse_var():
+    # 99% siega glebiej w ogon niz 95% -> strata (liczba ujemna) wieksza co do modulu.
+    returns = pd.Series([-i / 100 for i in range(1, 101)])
+    assert historical_var_pct(returns, 0.99) < historical_var_pct(returns, 0.95)
+
+
+def test_var_empty_series_returns_zero_not_crash():
+    assert historical_var_pct(pd.Series(dtype=float)) == 0.0
+
+
+def test_cvar_is_mean_of_the_tail_beyond_var():
+    # Ogon (najgorsze 5%) to zwroty <= progu VaR; CVaR = ich srednia,
+    # zawsze <= VaR (glebiej w strate).
+    returns = pd.Series([-i / 100 for i in range(1, 101)])
+    prog = returns.quantile(0.05)
+    expected = returns[returns <= prog].mean() * 100
+    assert cvar_pct(returns, 0.95) == pytest.approx(expected)
+    assert cvar_pct(returns, 0.95) <= historical_var_pct(returns, 0.95)
+
+
+def test_cvar_empty_series_returns_zero_not_crash():
+    assert cvar_pct(pd.Series(dtype=float)) == 0.0
+
+
+# --- overlapping_horizon_returns -------------------------------------------
+
+def test_overlapping_window_compounds_consecutive_days():
+    # Staly +10% dziennie przez 3 dni w oknie 2: kazde okno = 1.1*1.1 - 1 = 21%.
+    returns = pd.Series([0.1, 0.1, 0.1])
+    out = overlapping_horizon_returns(returns, window=2)
+    assert len(out) == 2                       # dwa nakladajace sie okna
+    assert out.iloc[0] == pytest.approx(0.21)
+    assert out.iloc[1] == pytest.approx(0.21)
+
+
+def test_overlapping_window_too_short_returns_empty():
+    returns = pd.Series([0.1, 0.2])
+    assert overlapping_horizon_returns(returns, window=5).empty
+
+
+# --- portfolio_shock_pct (czysta arytmetyka stress testu) ------------------
+
+def test_portfolio_shock_is_weighted_sum_of_shocks():
+    # 60% w spolce ktora spada -50%, 40% w spolce ktora spada -10%:
+    # 0.6*-0.5 + 0.4*-0.1 = -0.34 -> -34%.
+    weights = {"AAA": 0.6, "BBB": 0.4}
+    shocks = {"AAA": -0.5, "BBB": -0.1}
+    assert portfolio_shock_pct(weights, shocks) == pytest.approx(-34.0)
+
+
+def test_portfolio_shock_single_position_passes_shock_through():
+    assert portfolio_shock_pct({"AAA": 1.0}, {"AAA": -0.55}) == pytest.approx(-55.0)
 
 
 # --- max_drawdown_pct ------------------------------------------------------

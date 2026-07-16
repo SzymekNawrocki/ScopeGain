@@ -87,5 +87,36 @@ dokładnie ta luka), zaraz po nim **rebalancing** (domyka werdykt z „ostrzegam
 „zrób to”). Granica efektywna i VaR jako kolejne — świetne, ale albo bardziej
 ryzykowne poznawczo (#2), albo bardziej „ryzyko” niż „korzyść dla usera” (#4).
 
-_Decyzja o wyborze — do podjęcia. Plik żywy: aktualizować po decyzji i po każdej
-zbudowanej funkcji._
+---
+
+## ✅ DECYZJA (sesja grillowa 07/2026)
+
+Napięcie z góry pliku zostało rozstrzygnięte w dwóch krokach:
+
+1. **Tożsamość apki = NARZĘDZIE DO MYŚLENIA, nie robo-doradca.** Apka liczy,
+   pokazuje ryzyko i konfrontuje decyzje, ale świadomie NIE wydaje zleceń
+   „kup/sprzedaj". Wartość = jasność + pokora poznawcza (obronialne na rozmowie,
+   nie kłamie userowi). Konsekwencja: rebalancing (12c) — bez dosłownych zleceń w USD.
+
+2. **Pierwsza funkcja forward = #4 VaR + stress test** (NIE Monte Carlo). Powód:
+   najuczciwsza — VaR historyczny to percentyl realnych zwrotów, stress odtwarza
+   realne krachy; nic nie prognozuje. Pasuje do „delikatnie pokaż ryzyko".
+
+### ✅ Zbudowane
+- `quant.py`: `historical_var_pct`, `cvar_pct`, `overlapping_horizon_returns`
+  (VaR miesięczny z nakładających się okien 21d, nie ze skalowania √21),
+  `portfolio_shock_pct` — czyste funkcje + testy pytest.
+- `market.py`: `close_series_range` + `CRASH_WINDOWS` (GFC 2008, COVID 2020).
+- `routers/portfolios.py`: `GET /portfolios/{id}/risk?window=` — VaR/CVaR (95/99,
+  1d/1m, w USD) + **stress hybrydowy z jawnym pokryciem** (realne zwroty gdzie
+  spółka istniała, proxy beta×indeks dla młodych) + ostrzeżenie o oknie hossy.
+  Refactor: helper `_portfolio_value_series` (dedup krzywej portfela).
+- Front: `RiskReport.tsx` + sekcja „ryzyko" + kotwica w `Nav`; wykres „ja vs rynek"
+  oznaczony jako **hipotetyczny (dzisiejsze wagi)**.
+
+### Następny naturalny krok
+**Log transakcji (12b)** — usuwa „fikcję dzisiejszych wag" u źródła i odblokowuje
+werdykt behawioralny (behavior gap, #1 udokumentowana wartość wg researchu 12).
+Monte Carlo / granica efektywna — później, zawsze „z ostrzeżeniem" o out-of-sample.
+
+_Plik żywy: aktualizować po każdej kolejnej zbudowanej funkcji._

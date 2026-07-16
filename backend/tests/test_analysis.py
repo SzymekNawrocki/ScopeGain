@@ -5,7 +5,9 @@ progi albo sumowanie ocen sa zle, apka wprost klamie. Testujemy kazda granice
 osobno (good/warn/bad) i sama agregacje do oceny koncowej.
 """
 
-from analysis import BAD, GOOD, WARN, build_verdict
+import pytest
+
+from analysis import BAD, GOOD, WARN, build_behavior_verdict, build_verdict
 
 
 def all_good_kwargs() -> dict:
@@ -176,3 +178,56 @@ def test_overall_grade_bad_when_points_are_negative():
     v = build_verdict(**kwargs)
     assert v["grade"] == BAD
     assert v["grade_label"] == "slaby"
+
+
+# --- werdykt zachowania (12b: behavior gap) --------------------------------
+
+def _sell(ticker, sold, now, qty=10, date="2026-01-01") -> dict:
+    return {"ticker": ticker, "quantity": qty, "sold_price": sold,
+            "current_price": now, "executed_at": date}
+
+
+def test_behavior_sold_a_winner_is_bad_and_counts_left_on_table():
+    # sprzedales po 100, dzis 130 (+30%) -> za wczesnie; 10 szt -> 300 na stole.
+    v = build_behavior_verdict([_sell("AAPL", 100.0, 130.0, qty=10)])
+    assert v["findings"][0]["severity"] == BAD
+    assert v["total_left_on_table"] == pytest.approx(300.0)
+    assert v["grade"] == BAD
+
+
+def test_behavior_good_exit_when_price_fell_after_sell():
+    # sprzedales po 100, dzis 80 (-20%) -> dobre wyjscie, uniknieta strata.
+    v = build_behavior_verdict([_sell("XYZ", 100.0, 80.0, qty=5)])
+    assert v["findings"][0]["severity"] == GOOD
+    assert v["total_left_on_table"] == pytest.approx(-100.0)  # trzymanie byloby gorsze
+    assert v["grade"] == GOOD
+
+
+def test_behavior_small_move_is_neutral_warn():
+    # +5% to szum ponizej progu 10% -> neutralny timing.
+    v = build_behavior_verdict([_sell("MSFT", 100.0, 105.0)])
+    assert v["findings"][0]["severity"] == WARN
+    assert v["grade"] == WARN
+
+
+def test_behavior_empty_log_returns_no_data_grade():
+    v = build_behavior_verdict([])
+    assert v["grade"] == WARN
+    assert v["grade_label"] == "brak danych"
+    assert v["total_left_on_table"] == 0.0
+    assert len(v["findings"]) == 1
+
+
+def test_behavior_skips_rows_without_current_price():
+    # spolka bez dzisiejszej ceny (np. wycofana) nie moze byc oceniona -> pomijana.
+    rows = [
+        {"ticker": "DEAD", "quantity": 3, "sold_price": 50.0,
+         "current_price": None, "executed_at": "2025-06-01"},
+    ]
+    v = build_behavior_verdict(rows)
+    assert v["grade_label"] == "brak danych"
+
+
+def test_behavior_always_includes_honest_caveat():
+    v = build_behavior_verdict([_sell("AAPL", 100.0, 130.0)])
+    assert "gotowka" in v["caveat"]

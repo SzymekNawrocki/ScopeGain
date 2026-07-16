@@ -6,6 +6,8 @@ const LINKS: [string, string][] = [
   ["portfele", "Portfele"],
   ["rynek", "Rynek"],
   ["analiza", "Analiza"],
+  ["ryzyko", "Ryzyko"],
+  ["zachowanie", "Zachowanie"],
 ];
 
 export function Nav() {

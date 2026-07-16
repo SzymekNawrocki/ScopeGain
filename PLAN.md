@@ -212,11 +212,14 @@ i rozumiem, dlaczego działa.
       Czyste `quant.net_pnl()` (prowizja 0,29% kupno+sprzedaż, Belka tylko
       od zysku po prowizjach) + 4 nowe pola w `PortfolioValuation` + wiersz
       „netto w kieszeni" pod brutto w `PortfolioCard`.
-- [ ] **12b.** Log transakcji + „werdykt zachowania": zapisuj historię
-      kupna/sprzedaży (nie tylko aktualny stan pozycji — nowa tabela/model),
-      żeby werdykt umiał powiedzieć „sprzedałeś X trzy miesiące temu, od
-      tamtej pory rynek urósł o Y%". Atakuje bezpośrednio przyczynę #1
-      niedoważenia wyniku (behavior gap), nie tylko dobór aktywów.
+- [x] **12b.** Log transakcji + „werdykt zachowania": nowa tabela `transactions`
+      (append-only, obok pozycji) + `POST/GET/DELETE /portfolios/{id}/transactions`.
+      `GET /portfolios/{id}/behavior` porównuje cenę SPRZEDAŻY z dzisiejszą i mówi
+      „sprzedałeś X za wcześnie, urósł o Y%, zostawiłeś $Z" (albo „dobre wyjście").
+      Czysta `analysis.build_behavior_verdict` + testy; front: sekcja „zachowanie"
+      (log + werdykt) z uczciwym caveat „nie wiemy, co zrobiłeś z gotówką".
+      Atakuje przyczynę #1 niedoważenia wyniku (behavior gap). ⚠ migracja
+      `a1b2c3d4e5f6` do odpalenia: `alembic upgrade head` (pisana ręcznie, Docker był offline).
 - [ ] **12c.** Sugestia rebalancingu: werdykt już wykrywa koncentrację
       (`top_weight_pct` w `analysis.py`) — dołóż konkretną podpowiedź
       „przytnij X o Y%, dokup Z", nie tylko samo ostrzeżenie.
@@ -256,7 +259,11 @@ i rozumiem, dlaczego działa.
 - [x] **Warstwa UX+** — onboarding „jak to działa" (3 kroki) + jaśniejszy nagłówek/puste stany ✅
 - [x] **Warstwa 5** — Auth: rejestracja/logowanie, JWT w httpOnly cookie, portfele per-user ✅
 - [ ] **Warstwy 7–11** — Docker, chmura, CI/CD, monitoring, security (później)
-- [ ] **Warstwa 12** — Realna wartość: P&L netto (koszty+Belka ✅ 12a), werdykt zachowania (12b), rebalancing (12c) ← **następna**
+- [x] **Warstwa ryzyka (VaR + stress)** — decyzja grillowa: apka = narzędzie do
+      myślenia (nie robo-doradca). `GET /portfolios/{id}/risk`: VaR/CVaR historyczny
+      (95/99, 1d/1m, w USD) + stress hybrydowy z jawnym pokryciem. Patrz `QUANT_ROADMAP.md`. ✅
+- [ ] **Warstwa 12** — Realna wartość: P&L netto (12a ✅), werdykt zachowania
+      (12b ✅ — log transakcji + timing sprzedaży), rebalancing (12c ← **następne**)
 - [ ] **Warstwa 13** — Reżimy rynkowe (Markov) — eksploracyjna, po Warstwie 12
 
 **Backend — moduły (mapa):**
@@ -265,7 +272,7 @@ i rozumiem, dlaczego działa.
   backtest, korelacje, werdykt — wszystko chronione i scope'owane per-user)
 - `security.py` — bcrypt (hash/verify), JWT (create/decode), `get_current_user` (czyta cookie)
 - `quant.py` — czyste obliczenia (zwroty, zmienność, drawdown, Sharpe, beta)
-- `analysis.py` — silnik reguł werdyktu (liczby → wnioski + ocena)
+- `analysis.py` — silnik reguł werdyktu portfela + werdyktu zachowania (12b: timing sprzedaży)
 - `market.py` — jedyne miejsce z yfinance (ceny, historia, benchmark SPY)
 
 **Frontend — auth (mapa):**

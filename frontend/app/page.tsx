@@ -2,6 +2,8 @@ import { MarketScope } from "./components/MarketScope";
 import { PortfoliosProvider } from "./components/PortfoliosProvider";
 import { PortfoliosSection } from "./components/PortfoliosSection";
 import { AnalysisSection } from "./components/AnalysisSection";
+import { RiskSection } from "./components/RiskSection";
+import { BehaviorSection } from "./components/BehaviorSection";
 import { HowItWorks } from "./components/HowItWorks";
 import { AuthProvider } from "./components/AuthProvider";
 import { AuthGate } from "./components/AuthGate";
@@ -58,6 +60,18 @@ export default function Dashboard() {
             <section id="analiza" className="mt-16 scroll-mt-20">
               <SectionLabel>./portfolio --analyze</SectionLabel>
               <AnalysisSection />
+            </section>
+
+            {/* RYZYKO - VaR/CVaR + stress test (ile realnie moge stracic) */}
+            <section id="ryzyko" className="mt-16 scroll-mt-20">
+              <SectionLabel>./portfolio --risk</SectionLabel>
+              <RiskSection />
+            </section>
+
+            {/* ZACHOWANIE - log transakcji + werdykt timingu (behavior gap, 12b) */}
+            <section id="zachowanie" className="mt-16 scroll-mt-20">
+              <SectionLabel>./portfolio --behavior</SectionLabel>
+              <BehaviorSection />
             </section>
           </PortfoliosProvider>
         </AuthGate>

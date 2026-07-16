@@ -11,6 +11,14 @@ import yfinance as yf
 # S&P 500 przez ETF SPY - nasz "rynek", do ktorego porownujemy wyniki.
 BENCHMARK = "SPY"
 
+# Okna historycznych krachow do stress testu (data od, data do). Bierzemy
+# szczyt->dolek, zeby zlapac PELNA skale spadku. Uzywane przez endpoint /risk:
+# realny zwrot spolki w tym oknie = "gdyby to sie powtorzylo na moim portfelu".
+CRASH_WINDOWS = {
+    "gfc_2008": {"label": "Kryzys 2008 (Lehman)", "start": "2008-09-01", "end": "2009-03-09"},
+    "covid_2020": {"label": "COVID-19 (III 2020)", "start": "2020-02-19", "end": "2020-03-23"},
+}
+
 
 def latest_prices(tickers: list[str]) -> dict[str, float]:
     """Ostatnia znana cena zamkniecia dla kazdej spolki.
@@ -56,6 +64,25 @@ def close_series(ticker: str, period: str = "6mo") -> pd.Series:
 
     close = dane["Close"]
     # Przy jednej spolce "Close" bywa DataFrame z jedna kolumna - bierzemy ja.
+    if isinstance(close, pd.DataFrame):
+        close = close.iloc[:, 0]
+    return close.dropna()
+
+
+def close_series_range(ticker: str, start: str, end: str) -> pd.Series:
+    """Ceny zamkniecia jednej spolki miedzy dwiema DATAMI (nie 'period').
+
+    Do stress testu: potrzebujemy okna konkretnego krachu (np. 2008-09..2009-03).
+    Pusta Series = spolka wtedy nie istniala/brak danych - warstwa wyzej pozna
+    po tym, ze musi uzyc proxy (beta x indeks) zamiast realnych zwrotow.
+    """
+    dane = yf.download(
+        ticker, start=start, end=end, interval="1d", progress=False, auto_adjust=True
+    )
+    if dane.empty:
+        return pd.Series(dtype=float)
+
+    close = dane["Close"]
     if isinstance(close, pd.DataFrame):
         close = close.iloc[:, 0]
     return close.dropna()

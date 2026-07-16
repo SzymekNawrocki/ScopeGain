@@ -1,4 +1,6 @@
-from sqlalchemy import ForeignKey, Numeric, String
+from datetime import date
+
+from sqlalchemy import Date, ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
@@ -42,6 +44,11 @@ class Portfolio(Base):
         back_populates="portfolio", cascade="all, delete-orphan"
     )
 
+    # relacja: jeden portfel ma wiele transakcji (log kupna/sprzedazy - warstwa 12b).
+    transactions: Mapped[list["Transaction"]] = relationship(
+        back_populates="portfolio", cascade="all, delete-orphan"
+    )
+
 
 class Position(Base):
     __tablename__ = "positions"
@@ -56,3 +63,25 @@ class Position(Base):
 
     # druga strona relacji - dostep do portfela z poziomu pozycji.
     portfolio: Mapped["Portfolio"] = relationship(back_populates="positions")
+
+
+class Transaction(Base):
+    """Log kupna/sprzedazy (warstwa 12b) - APPEND-ONLY, obok pozycji.
+
+    Pozycje mowia "co mam TERAZ". Transakcje mowia "co ZROBILEM i KIEDY" - tego
+    stan pozycji nie pamieta. Dzieki temu werdykt zachowania umie powiedziec
+    "sprzedales X 3 miesiace temu, od tamtej pory urosl o Y%" (behavior gap).
+    Nie zastepuje pozycji - to osobna, historyczna prawda o decyzjach.
+    """
+
+    __tablename__ = "transactions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ticker: Mapped[str] = mapped_column(String(10))
+    side: Mapped[str] = mapped_column(String(4))               # "BUY" / "SELL"
+    quantity: Mapped[float] = mapped_column(Numeric(18, 4))    # ile sztuk
+    price: Mapped[float] = mapped_column(Numeric(18, 4))       # cena za sztuke w transakcji
+    executed_at: Mapped[date] = mapped_column(Date)            # dzien transakcji
+
+    portfolio_id: Mapped[int] = mapped_column(ForeignKey("portfolios.id"), index=True)
+    portfolio: Mapped["Portfolio"] = relationship(back_populates="transactions")

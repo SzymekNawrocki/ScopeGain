@@ -175,6 +175,15 @@ export function PortfolioVsMarket({ portfolios }: { portfolios: Portfolio[] }) {
           </div>
         )}
 
+        {/* Uczciwosc: backtest rzutuje DZISIEJSZE ilosci na caly okres (brak logu
+            transakcji) - to hipoteza "gdybym od poczatku trzymal to, co mam dzis",
+            nie Twoja realna sciezka. */}
+        {perf && (
+          <p className="mb-4 font-mono text-xs italic text-muted-foreground">
+            * krzywa hipotetyczna — zaklada dzisiejsze wagi przez caly okres (bez historii transakcji)
+          </p>
+        )}
+
         {/* Panel ryzyko/nagroda - twarde metryki, ktorych broker nie daje */}
         {perf && <RiskPanel risk={perf.risk} />}
 

@@ -1,3 +1,6 @@
+from datetime import date
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 # ------------------------------------------------------------------------
@@ -46,6 +49,29 @@ class PositionRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# --- TRANSAKCJA (warstwa 12b: log kupna/sprzedazy) ---
+# Osobny byt od pozycji: pozycja = "co mam teraz", transakcja = "co zrobilem
+# i kiedy". Potrzebne, zeby werdykt zachowania ocenil timing sprzedazy.
+
+class TransactionCreate(BaseModel):
+    ticker: str = Field(min_length=1, max_length=10)
+    side: Literal["BUY", "SELL"]          # tylko te dwie wartosci - Pydantic pilnuje
+    quantity: float = Field(gt=0)
+    price: float = Field(gt=0)            # cena za sztuke w momencie transakcji
+    executed_at: date                     # dzien transakcji (YYYY-MM-DD)
+
+
+class TransactionRead(BaseModel):
+    id: int
+    ticker: str
+    side: str
+    quantity: float
+    price: float
+    executed_at: date
+
+    model_config = {"from_attributes": True}
+
+
 # --- PORTFEL ---
 
 # To, co klient PRZYSYLA, tworzac portfel. Tylko nazwa - reszta to sprawa bazy.
@@ -91,3 +117,36 @@ class PortfolioValuation(BaseModel):
     total_tax_belka: float    # podatek od zyskow kapitalowych, 19% (tylko od zysku)
     total_pnl_net_abs: float  # zysk/strata NETTO w $ (brutto - prowizje - podatek)
     total_pnl_net_pct: float  # zysk/strata NETTO w %
+
+
+# --- RYZYKO (VaR / CVaR / stress test) ---
+# Policzony wynik, nie tabela. "Ile realnie moge stracic" w % I w kwocie.
+
+class VarMeasure(BaseModel):
+    confidence: float   # 0.95 lub 0.99 - poziom pewnosci
+    horizon: str        # "1d" (dzien) / "1m" (~21 sesji)
+    var_pct: float      # VaR w % (ujemny: strata, ktorej z danym p-stwem nie przekroczysz)
+    var_abs: float      # VaR w walucie portfela (var_pct * wartosc)
+    cvar_pct: float     # CVaR w % - srednia strata POZA progiem VaR (ogon)
+    cvar_abs: float     # CVaR w walucie portfela
+
+
+class StressScenario(BaseModel):
+    key: str            # "gfc_2008" / "covid_2020"
+    label: str          # ludzka nazwa krachu
+    shock_pct: float    # laczne uderzenie w portfel w % (ujemne)
+    pnl_abs: float      # strata w walucie portfela
+    coverage_real: list[str]   # spolki policzone z REALNYCH danych z krachu
+    coverage_proxy: list[str]  # spolki przez PROXY (beta x indeks) - nie zyly wtedy
+
+
+class PortfolioRisk(BaseModel):
+    id: int
+    name: str
+    window: str              # okno estymacji VaR ("1y"/"2y"/"5y")
+    currency: str            # waluta kwot - dzis "USD" (spolki w dolarach, nie udajemy PLN)
+    portfolio_value: float   # dzisiejsza wartosc portfela (baza kwot ryzyka)
+    n_days: int              # ile dni danych stalo za VaR (wiarygodnosc okna)
+    var: list[VarMeasure]
+    stress: list[StressScenario]
+    warning: str | None      # np. "okno to glownie hossa - VaR moze zanizac ryzyko"
