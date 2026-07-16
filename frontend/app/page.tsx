@@ -4,6 +4,7 @@ import { PortfoliosSection } from "./components/PortfoliosSection";
 import { AnalysisSection } from "./components/AnalysisSection";
 import { RiskSection } from "./components/RiskSection";
 import { BehaviorSection } from "./components/BehaviorSection";
+import { RebalanceSection } from "./components/RebalanceSection";
 import { HowItWorks } from "./components/HowItWorks";
 import { AuthProvider } from "./components/AuthProvider";
 import { AuthGate } from "./components/AuthGate";
@@ -72,6 +73,12 @@ export default function Dashboard() {
             <section id="zachowanie" className="mt-16 scroll-mt-20">
               <SectionLabel>./portfolio --behavior</SectionLabel>
               <BehaviorSection />
+            </section>
+
+            {/* REBALANS - jak daleko od rownych wag + koszt domkniecia (12c) */}
+            <section id="rebalans" className="mt-16 scroll-mt-20">
+              <SectionLabel>./portfolio --rebalance</SectionLabel>
+              <RebalanceSection />
             </section>
           </PortfoliosProvider>
         </AuthGate>

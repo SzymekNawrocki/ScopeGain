@@ -112,6 +112,70 @@ def net_pnl(
     }
 
 
+# --- Rebalansing (warstwa 12c): jak daleko od rownych wag + koszt ruchu -----
+# NIE robo-doradca (patrz ADR-0001) - to PUNKT ODNIESIENIA: rowne wagi (1/N)
+# jako neutralna miara koncentracji, plus uczciwy koszt domkniecia rozjazdu.
+
+def rebalance_plan(
+    holdings: dict[str, float],
+    target_weights: dict[str, float] | None = None,
+) -> list[dict]:
+    """Plan wyrownania portfela do wag docelowych (domyslnie rowne wagi 1/N).
+
+    holdings = {ticker: dzisiejsza wartosc pozycji}. Dla kazdej spolki liczy:
+    obecna waga, docelowa waga, dryf (pp, + = przewazona) i kwote do ruchu
+    (+ dokup / - przytnij). Suma trade_value ~ 0 (przesuwamy w obrebie portfela).
+    To miara "jak daleko od rownego rozlozenia", nie porada co kupic/sprzedac.
+    """
+    total = sum(holdings.values())
+    if total <= 0:
+        return []
+    n = len(holdings)
+    plan: list[dict] = []
+    for t, val in holdings.items():
+        cur_w = val / total
+        tgt_w = (target_weights.get(t, 0.0) if target_weights else 1.0 / n)
+        plan.append({
+            "ticker": t,
+            "current_value": round(val, 2),
+            "current_weight_pct": round(cur_w * 100, 2),
+            "target_weight_pct": round(tgt_w * 100, 2),
+            "drift_pp": round((cur_w - tgt_w) * 100, 2),   # + przewazona / - niedowazona
+            "trade_value": round(tgt_w * total - val, 2),  # + dokup / - przytnij
+        })
+    return plan
+
+
+def estimate_rebalance_cost(
+    legs: list[dict],
+    commission_pct: float = BROKER_COMMISSION_PCT,
+    tax_pct: float = BELKA_TAX_PCT,
+) -> dict[str, float]:
+    """Ile kosztuje WYKONANIE rebalansu: prowizja od kazdego ruchu + Belka od
+    zrealizowanego zysku na SPRZEDAWANYCH czesciach.
+
+    leg = {trade_value (+dokup/-przytnij), market_value, cost_basis}. Prowizja
+    liczona od |trade_value| (kupno i sprzedaz kosztuja). Przy przycinaniu
+    realizuje sie PROPORCJONALNY zysk pozycji: (|trade|/wartosc)*(wartosc-koszt);
+    Belka tylko od dodatniego. To pokazuje, ze rebalansing NIE jest darmowy.
+    """
+    prowizja = 0.0
+    podatek = 0.0
+    for leg in legs:
+        tv = float(leg["trade_value"])
+        prowizja += abs(tv) * commission_pct / 100
+        mv = float(leg.get("market_value") or 0.0)
+        if tv < 0 and mv > 0:                      # sprzedaz -> mozliwy podatek
+            frac = min(1.0, abs(tv) / mv)
+            zysk = frac * (mv - float(leg["cost_basis"]))
+            podatek += max(0.0, zysk) * tax_pct / 100
+    return {
+        "commission": round(prowizja, 2),
+        "tax_belka": round(podatek, 2),
+        "total_cost": round(prowizja + podatek, 2),
+    }
+
+
 # --- Warstwa ryzyka: VaR / CVaR / stress test ------------------------------
 # VaR = "jak duzo moge stracic w normalnie zly dzien/miesiac". CVaR = "a jak
 # JUZ jest zle (poza VaR), to srednio ile". Liczymy METODA HISTORYCZNA: bez

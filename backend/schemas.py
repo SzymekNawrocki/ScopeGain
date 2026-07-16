@@ -150,3 +150,32 @@ class PortfolioRisk(BaseModel):
     var: list[VarMeasure]
     stress: list[StressScenario]
     warning: str | None      # np. "okno to glownie hossa - VaR moze zanizac ryzyko"
+
+
+# --- REBALANSING (warstwa 12c) ---
+# NIE zlecenia "kup/sprzedaj" (ADR-0001) - PUNKT ODNIESIENIA: jak daleko od
+# rownych wag + ile kosztowaloby domkniecie rozjazdu (prowizja + Belka).
+
+class RebalanceLeg(BaseModel):
+    ticker: str
+    current_value: float
+    current_weight_pct: float
+    target_weight_pct: float
+    drift_pp: float          # + = przewazona, - = niedowazona (punkty procentowe)
+    trade_value: float       # + = dokup, - = przytnij (w walucie portfela)
+
+
+class RebalanceCost(BaseModel):
+    commission: float        # prowizja od wszystkich ruchow
+    tax_belka: float         # podatek od zrealizowanego zysku na przycieciach
+    total_cost: float        # laczny koszt wykonania rebalansu
+
+
+class RebalancePlan(BaseModel):
+    id: int
+    name: str
+    currency: str            # "USD"
+    total_value: float
+    target: str              # "equal" - rowne wagi jako neutralny punkt odniesienia
+    legs: list[RebalanceLeg]
+    cost: RebalanceCost

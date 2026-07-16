@@ -22,11 +22,13 @@ from quant import (
     annualized_volatility_pct,
     beta,
     cvar_pct,
+    estimate_rebalance_cost,
     historical_var_pct,
     max_drawdown_pct,
     net_pnl,
     overlapping_horizon_returns,
     portfolio_shock_pct,
+    rebalance_plan,
     returns_frame,
     sharpe_ratio,
 )
@@ -39,6 +41,9 @@ from schemas import (
     PositionCreate,
     PositionRead,
     PositionValuation,
+    RebalanceCost,
+    RebalanceLeg,
+    RebalancePlan,
     StressScenario,
     TransactionCreate,
     TransactionRead,
@@ -536,6 +541,60 @@ def portfolio_behavior(
 
     werdykt = build_behavior_verdict(rows)
     return {"id": portfel.id, "name": portfel.name, **werdykt}
+
+
+# REBALANSING (warstwa 12c): jak daleko portfel od rownych wag + ile
+# kosztowaloby domkniecie rozjazdu. NIE zlecenie "kup/sprzedaj" (ADR-0001) -
+# rowne wagi to neutralny PUNKT ODNIESIENIA, koszt (prowizja+Belka) to
+# uczciwy trade-off ("rebalansing nie jest darmowy"), nie porada.
+@router.get("/{portfolio_id}/rebalance", response_model=RebalancePlan)
+def portfolio_rebalance(
+    portfolio_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    portfel = _get_owned_portfolio(portfolio_id, user, db)
+    if not portfel.positions:
+        raise HTTPException(status_code=400, detail="Portfel jest pusty - nie ma co rebalansowac.")
+
+    # Agregacja per ticker: ilosc, koszt wejscia (do Belki na przycieciach).
+    ilosci = _quantities_by_ticker(portfel.positions)
+    koszt_bazowy: dict[str, float] = defaultdict(float)
+    for p in portfel.positions:
+        koszt_bazowy[p.ticker.upper()] += float(p.quantity) * float(p.buy_price)
+
+    # Dzisiejsza wartosc per ticker (tylko spolki z cena rynkowa).
+    ceny = latest_prices(list(ilosci.keys()))
+    holdings = {t: ilosci[t] * cena for t, cena in ceny.items()}
+    total = sum(holdings.values())
+    if total <= 0:
+        raise HTTPException(status_code=404, detail="Brak aktualnych cen dla tego portfela.")
+
+    plan = rebalance_plan(holdings)   # domyslnie rowne wagi 1/N
+
+    # Koszt wykonania: prowizja od kazdego ruchu + Belka od zysku na przycieciach.
+    legi = [
+        {
+            "trade_value": p["trade_value"],
+            "market_value": holdings[p["ticker"]],
+            "cost_basis": koszt_bazowy[p["ticker"]],
+        }
+        for p in plan
+    ]
+    koszt = estimate_rebalance_cost(legi)
+
+    # Najpierw najbardziej przewazone (najwiekszy dodatni dryf).
+    plan.sort(key=lambda p: p["drift_pp"], reverse=True)
+
+    return RebalancePlan(
+        id=portfel.id,
+        name=portfel.name,
+        currency="USD",
+        total_value=round(total, 2),
+        target="equal",
+        legs=[RebalanceLeg(**p) for p in plan],
+        cost=RebalanceCost(**koszt),
+    )
 
 
 # Korelacje miedzy spolkami w portfelu (na dziennych zwrotach).

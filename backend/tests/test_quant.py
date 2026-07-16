@@ -13,11 +13,13 @@ from quant import (
     beta,
     cvar_pct,
     daily_returns,
+    estimate_rebalance_cost,
     historical_var_pct,
     max_drawdown_pct,
     net_pnl,
     overlapping_horizon_returns,
     portfolio_shock_pct,
+    rebalance_plan,
     returns_frame,
     sharpe_ratio,
     total_return_pct,
@@ -246,6 +248,79 @@ def test_portfolio_shock_is_weighted_sum_of_shocks():
 
 def test_portfolio_shock_single_position_passes_shock_through():
     assert portfolio_shock_pct({"AAA": 1.0}, {"AAA": -0.55}) == pytest.approx(-55.0)
+
+
+# --- rebalance_plan (warstwa 12c) ------------------------------------------
+
+def test_rebalance_equal_weight_targets_one_over_n():
+    # 3 spolki -> cel 33.33% kazda. Przewazona ma dryf dodatni i trade ujemny.
+    holdings = {"AAA": 6000.0, "BBB": 2000.0, "CCC": 2000.0}  # total 10000
+    plan = {p["ticker"]: p for p in rebalance_plan(holdings)}
+    assert plan["AAA"]["target_weight_pct"] == pytest.approx(33.33, abs=0.01)
+    assert plan["AAA"]["current_weight_pct"] == pytest.approx(60.0)
+    assert plan["AAA"]["drift_pp"] == pytest.approx(26.67, abs=0.01)  # przewazona
+    assert plan["AAA"]["trade_value"] == pytest.approx(-2666.67, abs=0.01)  # przytnij
+    assert plan["BBB"]["trade_value"] == pytest.approx(1333.33, abs=0.01)   # dokup
+
+
+def test_rebalance_trades_sum_to_zero():
+    # Przesuwamy w obrebie portfela - suma ruchow ~ 0.
+    holdings = {"AAA": 5000.0, "BBB": 3000.0, "CCC": 2000.0}
+    plan = rebalance_plan(holdings)
+    assert sum(p["trade_value"] for p in plan) == pytest.approx(0.0, abs=0.05)
+
+
+def test_rebalance_already_balanced_needs_no_trades():
+    holdings = {"AAA": 1000.0, "BBB": 1000.0}
+    plan = rebalance_plan(holdings)
+    assert all(p["trade_value"] == pytest.approx(0.0) for p in plan)
+    assert all(p["drift_pp"] == pytest.approx(0.0) for p in plan)
+
+
+def test_rebalance_custom_target_weights():
+    holdings = {"AAA": 5000.0, "BBB": 5000.0}  # total 10000
+    plan = {p["ticker"]: p for p in rebalance_plan(holdings, {"AAA": 0.7, "BBB": 0.3})}
+    assert plan["AAA"]["trade_value"] == pytest.approx(2000.0)   # do 70% = 7000, dokup 2000
+    assert plan["BBB"]["trade_value"] == pytest.approx(-2000.0)  # do 30% = 3000, przytnij
+
+
+def test_rebalance_empty_or_zero_total_returns_empty():
+    assert rebalance_plan({}) == []
+    assert rebalance_plan({"AAA": 0.0}) == []
+
+
+# --- estimate_rebalance_cost -----------------------------------------------
+
+def test_rebalance_cost_commission_on_both_sides():
+    # przytnij 1000 (z zyskownej pozycji) + dokup 1000: prowizja 0.29% od kazdej.
+    legs = [
+        {"trade_value": -1000.0, "market_value": 5000.0, "cost_basis": 2500.0},
+        {"trade_value": 1000.0, "market_value": 1000.0, "cost_basis": 1000.0},
+    ]
+    out = estimate_rebalance_cost(legs)
+    assert out["commission"] == pytest.approx(2000.0 * 0.29 / 100)  # 5.80
+
+
+def test_rebalance_cost_belka_only_on_realized_gain_of_sells():
+    # przycinamy 1000 z pozycji wartej 5000 przy koszcie 2500 (zysk 50%).
+    # zrealizowany zysk = (1000/5000)*(5000-2500) = 500 -> Belka 19% = 95.
+    legs = [{"trade_value": -1000.0, "market_value": 5000.0, "cost_basis": 2500.0}]
+    out = estimate_rebalance_cost(legs)
+    assert out["tax_belka"] == pytest.approx(95.0)
+
+
+def test_rebalance_cost_no_belka_when_trimming_a_loser():
+    # pozycja pod woda (wartosc < koszt) -> sprzedaz nie generuje podatku.
+    legs = [{"trade_value": -1000.0, "market_value": 2000.0, "cost_basis": 3000.0}]
+    out = estimate_rebalance_cost(legs)
+    assert out["tax_belka"] == 0.0
+
+
+def test_rebalance_cost_buys_pay_only_commission():
+    legs = [{"trade_value": 1000.0, "market_value": 1000.0, "cost_basis": 1000.0}]
+    out = estimate_rebalance_cost(legs)
+    assert out["tax_belka"] == 0.0
+    assert out["commission"] == pytest.approx(1000.0 * 0.29 / 100)
 
 
 # --- max_drawdown_pct ------------------------------------------------------

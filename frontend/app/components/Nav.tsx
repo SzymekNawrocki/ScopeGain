@@ -8,6 +8,7 @@ const LINKS: [string, string][] = [
   ["analiza", "Analiza"],
   ["ryzyko", "Ryzyko"],
   ["zachowanie", "Zachowanie"],
+  ["rebalans", "Rebalans"],
 ];
 
 export function Nav() {

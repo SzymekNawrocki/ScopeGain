@@ -220,9 +220,12 @@ i rozumiem, dlaczego działa.
       (log + werdykt) z uczciwym caveat „nie wiemy, co zrobiłeś z gotówką".
       Atakuje przyczynę #1 niedoważenia wyniku (behavior gap). ⚠ migracja
       `a1b2c3d4e5f6` do odpalenia: `alembic upgrade head` (pisana ręcznie, Docker był offline).
-- [ ] **12c.** Sugestia rebalancingu: werdykt już wykrywa koncentrację
-      (`top_weight_pct` w `analysis.py`) — dołóż konkretną podpowiedź
-      „przytnij X o Y%, dokup Z", nie tylko samo ostrzeżenie.
+- [x] **12c.** Sugestia rebalancingu: `GET /portfolios/{id}/rebalance` —
+      równe wagi (1/N) jako neutralny PUNKT ODNIESIENIA (nie porada, ADR-0001):
+      dryf per spółka + „przytnij ~$X / dokup ~$Y" + **koszt domknięcia**
+      (prowizja + Belka od zysku na przycięciach — rebalansing nie jest darmowy).
+      Czyste `quant.rebalance_plan` + `estimate_rebalance_cost` + testy;
+      front: sekcja „rebalans" (paski obecna vs cel + panel kosztu z caveat).
 - **Zaskok:** „apka mówi mi coś, czego mój dotychczasowy P&L brutto ukrywał"
 - **Teoria:** podatek Belka, efekt składany kosztów, behavior gap, diversification return
 
@@ -262,8 +265,8 @@ i rozumiem, dlaczego działa.
 - [x] **Warstwa ryzyka (VaR + stress)** — decyzja grillowa: apka = narzędzie do
       myślenia (nie robo-doradca). `GET /portfolios/{id}/risk`: VaR/CVaR historyczny
       (95/99, 1d/1m, w USD) + stress hybrydowy z jawnym pokryciem. Patrz `QUANT_ROADMAP.md`. ✅
-- [ ] **Warstwa 12** — Realna wartość: P&L netto (12a ✅), werdykt zachowania
-      (12b ✅ — log transakcji + timing sprzedaży), rebalancing (12c ← **następne**)
+- [x] **Warstwa 12** — Realna wartość: P&L netto (12a ✅), werdykt zachowania
+      (12b ✅ — log transakcji + timing sprzedaży), rebalancing (12c ✅ — dryf + koszt) ✅
 - [ ] **Warstwa 13** — Reżimy rynkowe (Markov) — eksploracyjna, po Warstwie 12
 
 **Backend — moduły (mapa):**

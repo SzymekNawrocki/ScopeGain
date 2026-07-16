@@ -371,6 +371,41 @@ export async function getPortfolioBehavior(id: number): Promise<BehaviorVerdict>
   return res.json();
 }
 
+// --- Rebalansing (warstwa 12c: punkt odniesienia, NIE porada) ---
+// Rowne wagi jako neutralna miara koncentracji + ile kosztowaloby domkniecie
+// rozjazdu (prowizja + Belka). Apka nie mowi "zrob to" - pokazuje trade-off.
+
+export type RebalanceLeg = {
+  ticker: string;
+  current_value: number;
+  current_weight_pct: number;
+  target_weight_pct: number;
+  drift_pp: number; // + przewazona / - niedowazona
+  trade_value: number; // + dokup / - przytnij
+};
+
+export type RebalanceCost = {
+  commission: number;
+  tax_belka: number;
+  total_cost: number;
+};
+
+export type RebalancePlan = {
+  id: number;
+  name: string;
+  currency: string; // "USD"
+  total_value: number;
+  target: string; // "equal"
+  legs: RebalanceLeg[];
+  cost: RebalanceCost;
+};
+
+export async function getPortfolioRebalance(id: number): Promise<RebalancePlan> {
+  const res = await apiFetch(`/portfolios/${id}/rebalance`);
+  if (!res.ok) throw new Error(await apiError(res));
+  return res.json();
+}
+
 // --- Korelacje miedzy spolkami w portfelu (warstwa 6d) ---
 // matrix[i][j] = korelacja spolki tickers[i] z tickers[j] (od -1 do 1).
 export type PortfolioCorrelations = {
