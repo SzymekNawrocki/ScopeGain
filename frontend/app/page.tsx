@@ -5,6 +5,7 @@ import { AnalysisSection } from "./components/AnalysisSection";
 import { RiskSection } from "./components/RiskSection";
 import { BehaviorSection } from "./components/BehaviorSection";
 import { RebalanceSection } from "./components/RebalanceSection";
+import { RealPerformanceSection } from "./components/RealPerformanceSection";
 import { HowItWorks } from "./components/HowItWorks";
 import { AuthProvider } from "./components/AuthProvider";
 import { AuthGate } from "./components/AuthGate";
@@ -57,10 +58,16 @@ export default function Dashboard() {
               <MarketScope />
             </section>
 
-            {/* ANALIZA - werdykt, backtest vs rynek, ryzyko, korelacje */}
+            {/* ANALIZA - werdykt, backtest vs rynek (hipotetyczny), ryzyko, korelacje */}
             <section id="analiza" className="mt-16 scroll-mt-20">
               <SectionLabel>./portfolio --analyze</SectionLabel>
               <AnalysisSection />
+            </section>
+
+            {/* REALNA SCIEZKA - TWR z logu transakcji (kontra hipotetyczny wyzej) */}
+            <section id="realna" className="mt-16 scroll-mt-20">
+              <SectionLabel>./portfolio --real-path</SectionLabel>
+              <RealPerformanceSection />
             </section>
 
             {/* RYZYKO - VaR/CVaR + stress test (ile realnie moge stracic) */}

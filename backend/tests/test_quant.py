@@ -15,14 +15,17 @@ from quant import (
     daily_returns,
     estimate_rebalance_cost,
     historical_var_pct,
+    holdings_timeline,
     max_drawdown_pct,
     net_pnl,
     overlapping_horizon_returns,
     portfolio_shock_pct,
     rebalance_plan,
+    reconcile_holdings,
     returns_frame,
     sharpe_ratio,
     total_return_pct,
+    twr_index,
 )
 
 
@@ -321,6 +324,83 @@ def test_rebalance_cost_buys_pay_only_commission():
     out = estimate_rebalance_cost(legs)
     assert out["tax_belka"] == 0.0
     assert out["commission"] == pytest.approx(1000.0 * 0.29 / 100)
+
+
+# --- holdings_timeline (realna sciezka z logu) -----------------------------
+
+def test_holdings_timeline_steps_on_transaction_dates():
+    dates = pd.date_range("2024-01-01", periods=5)
+    txs = [
+        {"ticker": "AAPL", "side": "BUY", "quantity": 10, "executed_at": "2024-01-01"},
+        {"ticker": "AAPL", "side": "BUY", "quantity": 5, "executed_at": "2024-01-03"},
+        {"ticker": "AAPL", "side": "SELL", "quantity": 4, "executed_at": "2024-01-04"},
+    ]
+    h = holdings_timeline(txs, dates)
+    # 10 od 1., 15 od 3., 11 od 4.
+    assert h["AAPL"].tolist() == [10.0, 10.0, 15.0, 11.0, 11.0]
+
+
+def test_holdings_timeline_multiple_tickers():
+    dates = pd.date_range("2024-01-01", periods=3)
+    txs = [
+        {"ticker": "AAPL", "side": "BUY", "quantity": 10, "executed_at": "2024-01-01"},
+        {"ticker": "MSFT", "side": "BUY", "quantity": 2, "executed_at": "2024-01-02"},
+    ]
+    h = holdings_timeline(txs, dates)
+    assert h["MSFT"].tolist() == [0.0, 2.0, 2.0]
+    assert h["AAPL"].tolist() == [10.0, 10.0, 10.0]
+
+
+# --- twr_index (time-weighted, odporny na przeplywy) -----------------------
+
+def test_twr_starts_at_100_on_first_holding_day():
+    dates = pd.date_range("2024-01-01", periods=3)
+    values = pd.Series([1000.0, 1100.0, 1210.0], index=dates)
+    flows = pd.Series([1000.0, 0.0, 0.0], index=dates)   # tylko poczatkowa wplata
+    twr = twr_index(values, flows)
+    assert twr.iloc[0] == pytest.approx(100.0)
+    assert twr.iloc[1] == pytest.approx(110.0)   # +10%
+    assert twr.iloc[2] == pytest.approx(121.0)   # +10% skladane
+
+
+def test_twr_neutralizes_a_cash_inflow_midway():
+    # dzien 2: wartosc rosnie z 1000 do 2100, ale 1000 to DOKUPIENIE (flow),
+    # wiec realny zwrot rynku = (2100-1000)/1000 - 1 = +10%, nie +110%.
+    dates = pd.date_range("2024-01-01", periods=2)
+    values = pd.Series([1000.0, 2100.0], index=dates)
+    flows = pd.Series([1000.0, 1000.0], index=dates)
+    twr = twr_index(values, flows)
+    assert twr.iloc[1] == pytest.approx(110.0)
+
+
+def test_twr_ignores_leading_empty_days():
+    dates = pd.date_range("2024-01-01", periods=3)
+    values = pd.Series([0.0, 1000.0, 1050.0], index=dates)
+    flows = pd.Series([0.0, 1000.0, 0.0], index=dates)
+    twr = twr_index(values, flows)
+    assert len(twr) == 2                          # zaczyna od dnia z pozycja
+    assert twr.iloc[0] == pytest.approx(100.0)
+    assert twr.iloc[1] == pytest.approx(105.0)
+
+
+# --- reconcile_holdings ----------------------------------------------------
+
+def test_reconcile_matches_when_log_equals_positions():
+    out = reconcile_holdings({"AAPL": 6.0, "MSFT": 5.0}, {"AAPL": 6.0, "MSFT": 5.0})
+    assert out["reconciled"] is True
+    assert out["discrepancies"] == []
+
+
+def test_reconcile_flags_mismatch_with_diff():
+    out = reconcile_holdings({"AAPL": 6.0}, {"AAPL": 10.0})
+    assert out["reconciled"] is False
+    assert out["discrepancies"][0]["diff"] == pytest.approx(-4.0)
+
+
+def test_reconcile_flags_ticker_missing_on_one_side():
+    out = reconcile_holdings({"AAPL": 6.0, "NVDA": 3.0}, {"AAPL": 6.0})
+    assert out["reconciled"] is False
+    assert {d["ticker"] for d in out["discrepancies"]} == {"NVDA"}
 
 
 # --- max_drawdown_pct ------------------------------------------------------

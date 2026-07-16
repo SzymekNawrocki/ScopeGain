@@ -267,6 +267,11 @@ i rozumiem, dlaczego działa.
       (95/99, 1d/1m, w USD) + stress hybrydowy z jawnym pokryciem. Patrz `QUANT_ROADMAP.md`. ✅
 - [x] **Warstwa 12** — Realna wartość: P&L netto (12a ✅), werdykt zachowania
       (12b ✅ — log transakcji + timing sprzedaży), rebalancing (12c ✅ — dryf + koszt) ✅
+- [x] **Warstwa „uczciwość i domknięcie"** (lokalnie) ✅ — patrz
+      `docs/uczciwosc-i-domkniecie.md`. Migracja 12b odpalona + e2e; **realna
+      ścieżka portfela z logu transakcji** (TWR, źródło = log + rekoncyliacja,
+      `GET /portfolios/{id}/real-performance`, sekcja „realna"); **USD→PLN** z
+      NBP w wycenie (`fx_usd_pln`/`total_value_pln`/`total_pnl_net_pln`).
 - [ ] **Warstwa 13** — Reżimy rynkowe (Markov) — eksploracyjna, po Warstwie 12
 
 **Backend — moduły (mapa):**
@@ -276,7 +281,10 @@ i rozumiem, dlaczego działa.
 - `security.py` — bcrypt (hash/verify), JWT (create/decode), `get_current_user` (czyta cookie)
 - `quant.py` — czyste obliczenia (zwroty, zmienność, drawdown, Sharpe, beta)
 - `analysis.py` — silnik reguł werdyktu portfela + werdyktu zachowania (12b: timing sprzedaży)
-- `market.py` — jedyne miejsce z yfinance (ceny, historia, benchmark SPY)
+- `market.py` — dane zewnętrzne: yfinance (ceny, historia, benchmark SPY,
+  okna krachów, ceny po datach) + NBP (`usd_pln_rate`)
+- `quant.py` — dołożone: VaR/CVaR/stress, rebalans (plan+koszt), realna ścieżka
+  (`holdings_timeline`/`twr_index`/`reconcile_holdings`)
 
 **Frontend — auth (mapa):**
 - `AuthProvider` — jedno źródło prawdy o userze (`/auth/me` na starcie), login/register/logout

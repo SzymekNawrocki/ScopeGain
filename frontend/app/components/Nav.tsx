@@ -6,6 +6,7 @@ const LINKS: [string, string][] = [
   ["portfele", "Portfele"],
   ["rynek", "Rynek"],
   ["analiza", "Analiza"],
+  ["realna", "Realna"],
   ["ryzyko", "Ryzyko"],
   ["zachowanie", "Zachowanie"],
   ["rebalans", "Rebalans"],

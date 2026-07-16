@@ -168,6 +168,10 @@ export type PortfolioValuation = {
   total_tax_belka: number;
   total_pnl_net_abs: number;
   total_pnl_net_pct: number;
+  // --- Przeliczenie na PLN (kurs NBP); null gdy NBP nie odpowie ---
+  fx_usd_pln: number | null;
+  total_value_pln: number | null;
+  total_pnl_net_pln: number | null;
 };
 
 // Dociaga aktualna wycene portfela (ceny z rynku + policzony zysk/strata).
@@ -367,6 +371,41 @@ export type BehaviorVerdict = {
 
 export async function getPortfolioBehavior(id: number): Promise<BehaviorVerdict> {
   const res = await apiFetch(`/portfolios/${id}/behavior`);
+  if (!res.ok) throw new Error(await apiError(res));
+  return res.json();
+}
+
+// --- Realna sciezka portfela z logu transakcji (uczciwosc) ---
+// Zamiast rzutowac dzisiejsze wagi wstecz (hipoteza), liczy TWR z tego, co
+// NAPRAWDE trzymalo sie kazdego dnia. "available: false" gdy brak logu.
+
+export type ReconciliationDiscrepancy = {
+  ticker: string;
+  log: number;
+  positions: number;
+  diff: number;
+};
+
+export type RealPerformance = {
+  id: number;
+  name: string;
+  available: boolean;
+  reason?: string;
+  method?: string;
+  start_date?: string;
+  benchmark_ticker?: string;
+  portfolio_return_pct?: number;
+  benchmark_return_pct?: number;
+  alpha_pct?: number;
+  reconciliation?: {
+    reconciled: boolean;
+    discrepancies: ReconciliationDiscrepancy[];
+  };
+  series?: PerformancePoint[];
+};
+
+export async function getPortfolioRealPerformance(id: number): Promise<RealPerformance> {
+  const res = await apiFetch(`/portfolios/${id}/real-performance`);
   if (!res.ok) throw new Error(await apiError(res));
   return res.json();
 }

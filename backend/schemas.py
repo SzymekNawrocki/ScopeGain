@@ -117,6 +117,12 @@ class PortfolioValuation(BaseModel):
     total_tax_belka: float    # podatek od zyskow kapitalowych, 19% (tylko od zysku)
     total_pnl_net_abs: float  # zysk/strata NETTO w $ (brutto - prowizje - podatek)
     total_pnl_net_pct: float  # zysk/strata NETTO w %
+    # --- Przeliczenie na PLN (kurs NBP) - "realnie w kieszeni" po polsku ---
+    # None, gdy NBP nie odpowie. UPROSZCZENIE: kurs BIEZACY; poprawna Belka
+    # liczy sie po kursie NBP z dnia przed KAZDA transakcja (front to zaznacza).
+    fx_usd_pln: float | None = None       # kurs sredni USD/PLN
+    total_value_pln: float | None = None  # wartosc portfela w PLN
+    total_pnl_net_pln: float | None = None  # zysk/strata NETTO w PLN
 
 
 # --- RYZYKO (VaR / CVaR / stress test) ---

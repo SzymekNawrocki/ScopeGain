@@ -195,6 +195,26 @@ export function PortfolioCard({
               </span>
             </div>
           )}
+          {/* Przeliczenie na PLN (kurs NBP). Uproszczenie: kurs biezacy - poprawna
+              Belka liczy sie po kursie z dnia przed kazda transakcja. */}
+          {val?.total_value_pln != null && (
+            <div
+              className="flex items-baseline justify-between"
+              title={`Kurs NBP ${val.fx_usd_pln} PLN/USD. Uproszczenie: kurs biezacy - realna Belka liczy sie po kursie z dnia przed kazda transakcja.`}
+            >
+              <span className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                W PLN (netto)
+              </span>
+              <span className="font-mono text-sm text-muted-foreground">
+                ≈ {fmt(val.total_value_pln)} zl
+                {val.total_pnl_net_pln != null && (
+                  <span className={`ml-1 font-bold ${pnlColor(val.total_pnl_net_pln)}`}>
+                    ({val.total_pnl_net_pln >= 0 ? "+" : "−"}{fmt(Math.abs(val.total_pnl_net_pln))} zl)
+                  </span>
+                )}
+              </span>
+            </div>
+          )}
         </footer>
       </TerminalWindow>
     </article>

@@ -112,6 +112,76 @@ def net_pnl(
     }
 
 
+# --- Realna sciezka portfela z LOGU TRANSAKCJI (uczciwosc) ------------------
+# Backtest "ja vs rynek" rzutuje DZISIEJSZE wagi na cala historie - to hipoteza.
+# Majac log kupna/sprzedazy (12b) da sie odtworzyc, co NAPRAWDE trzymalo sie
+# kazdego dnia, i policzyc uczciwa krzywa. Zwroty liczymy metoda TWR
+# (time-weighted): na dniu z transakcja neutralizujemy przeplyw gotowki, zeby
+# dokupienie nie wygladalo jak "zysk" - dopiero to jest porownywalne z rynkiem.
+
+def holdings_timeline(transactions: list[dict], dates: pd.DatetimeIndex) -> pd.DataFrame:
+    """Ile sztuk KAZDEJ spolki trzymalo sie w kazdym dniu (skumulowany log).
+
+    transactions: [{ticker, side ('BUY'/'SELL'), quantity, executed_at}]. Dla
+    kazdej transakcji dodajemy (+kupno / -sprzedaz) do wszystkich dni od jej
+    daty wzwyz. Wynik: tabela dni x tickery z liczba posiadanych sztuk.
+    """
+    tickery = sorted({t["ticker"].upper() for t in transactions})
+    hold = pd.DataFrame(0.0, index=dates, columns=tickery)
+    for tx in transactions:
+        znak = 1.0 if tx["side"].upper() == "BUY" else -1.0
+        d = pd.Timestamp(tx["executed_at"])
+        hold.loc[hold.index >= d, tx["ticker"].upper()] += znak * float(tx["quantity"])
+    return hold
+
+
+def twr_index(values: pd.Series, flows: pd.Series) -> pd.Series:
+    """Krzywa time-weighted (indeks od 100), odporna na przeplywy gotowki.
+
+    values V_t = wartosc trzymanych pozycji na zamknieciu dnia t. flows CF_t =
+    gotowka wlozona(+)/wyjeta(-) tego dnia (po cenach zamkniecia). Zwrot dnia:
+    r_t = (V_t - CF_t) / V_{t-1} - 1 - odejmujemy przeplyw, wiec liczy sie tylko
+    ruch RYNKU, nie Twoje wplaty. Start = pierwszy dzien z niezerowa pozycja.
+    """
+    v = values.to_numpy(dtype=float)
+    cf = flows.reindex(values.index).fillna(0.0).to_numpy(dtype=float)
+    daty, poziomy = [], []
+    poziom, prev, started = 100.0, None, False
+    for i in range(len(v)):
+        if not started:
+            if v[i] > 0:                       # pierwszy dzien z pozycja = baza 100
+                started, prev = True, v[i]
+                daty.append(values.index[i]); poziomy.append(100.0)
+            continue
+        if prev and prev > 0:
+            poziom *= (1 + (v[i] - cf[i]) / prev - 1)
+        daty.append(values.index[i]); poziomy.append(round(poziom, 4))
+        prev = v[i]
+    return pd.Series(poziomy, index=pd.DatetimeIndex(daty))
+
+
+def reconcile_holdings(
+    log_net: dict[str, float],
+    positions_net: dict[str, float],
+    tol: float = 1e-4,
+) -> dict:
+    """Czy netto z logu transakcji zgadza sie z obecnymi pozycjami?
+
+    Zrodlo prawdy dla sciezki = log, ale pozycje mowia "ile mam teraz". Gdy sie
+    rozjezdzaja (user nie zalogowal wszystkiego), apka musi to POWIEDZIEC, a nie
+    udawac. Zwraca {reconciled, discrepancies:[{ticker, log, positions, diff}]}.
+    """
+    tickery = set(log_net) | set(positions_net)
+    rozjazdy = []
+    for t in sorted(tickery):
+        l = float(log_net.get(t, 0.0))
+        p = float(positions_net.get(t, 0.0))
+        if abs(l - p) > tol:
+            rozjazdy.append({"ticker": t, "log": round(l, 4),
+                             "positions": round(p, 4), "diff": round(l - p, 4)})
+    return {"reconciled": len(rozjazdy) == 0, "discrepancies": rozjazdy}
+
+
 # --- Rebalansing (warstwa 12c): jak daleko od rownych wag + koszt ruchu -----
 # NIE robo-doradca (patrz ADR-0001) - to PUNKT ODNIESIENIA: rowne wagi (1/N)
 # jako neutralna miara koncentracji, plus uczciwy koszt domkniecia rozjazdu.

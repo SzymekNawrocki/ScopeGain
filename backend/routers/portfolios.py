@@ -1,4 +1,5 @@
 from collections import defaultdict
+from datetime import date
 from typing import Literal
 
 import pandas as pd
@@ -14,7 +15,9 @@ from market import (
     close_series,
     close_series_range,
     closes_frame,
+    closes_frame_range,
     latest_prices,
+    usd_pln_rate,
 )
 from models import Portfolio, Position, Transaction, User
 from security import get_current_user
@@ -24,13 +27,16 @@ from quant import (
     cvar_pct,
     estimate_rebalance_cost,
     historical_var_pct,
+    holdings_timeline,
     max_drawdown_pct,
     net_pnl,
     overlapping_horizon_returns,
     portfolio_shock_pct,
     rebalance_plan,
+    reconcile_holdings,
     returns_frame,
     sharpe_ratio,
+    twr_index,
 )
 
 from schemas import (
@@ -176,6 +182,11 @@ def portfolio_valuation(
     # i podatek Belka (patrz quant.net_pnl - warstwa 12a).
     netto = net_pnl(total_cost, total_value)
 
+    # Przeliczenie na PLN (kurs NBP). None, gdy NBP nie odpowie - wycena USD zostaje.
+    kurs = usd_pln_rate()
+    value_pln = round(total_value * kurs, 2) if kurs else None
+    net_pln = round(netto["net_pnl_abs"] * kurs, 2) if kurs else None
+
     return PortfolioValuation(
         id=portfel.id,
         name=portfel.name,
@@ -188,6 +199,9 @@ def portfolio_valuation(
         total_tax_belka=netto["tax_belka"],
         total_pnl_net_abs=netto["net_pnl_abs"],
         total_pnl_net_pct=netto["net_pnl_pct"],
+        fx_usd_pln=round(kurs, 4) if kurs else None,
+        total_value_pln=value_pln,
+        total_pnl_net_pln=net_pln,
     )
 
 
@@ -595,6 +609,93 @@ def portfolio_rebalance(
         legs=[RebalanceLeg(**p) for p in plan],
         cost=RebalanceCost(**koszt),
     )
+
+
+# REALNA sciezka portfela z LOGU TRANSAKCJI: zamiast rzutowac dzisiejsze wagi
+# wstecz (hipoteza), odtwarza co NAPRAWDE trzymalo sie kazdego dnia i liczy TWR
+# (neutralizacja przeplywow). Zrodlo prawdy = log; pozycje to "ile mam teraz",
+# wiec gdy netto z logu != pozycje, mowimy o tym wprost (rekoncyliacja).
+@router.get("/{portfolio_id}/real-performance")
+def portfolio_real_performance(
+    portfolio_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    portfel = _get_owned_portfolio(portfolio_id, user, db)
+
+    transakcje = db.scalars(
+        select(Transaction)
+        .where(Transaction.portfolio_id == portfolio_id)
+        .order_by(Transaction.executed_at.asc())
+    ).all()
+    if not transakcje:
+        return {"id": portfel.id, "name": portfel.name, "available": False,
+                "reason": "Brak transakcji w logu - dodaj kupna/sprzedaze, zeby zobaczyc realna sciezke."}
+
+    txs = [{"ticker": t.ticker.upper(), "side": t.side,
+            "quantity": float(t.quantity), "executed_at": t.executed_at} for t in transakcje]
+    tickery = sorted({t["ticker"] for t in txs})
+    start = min(t["executed_at"] for t in txs).isoformat()
+
+    ceny = closes_frame_range(tickery, start)
+    if ceny.empty:
+        return {"id": portfel.id, "name": portfel.name, "available": False,
+                "reason": "Brak danych rynkowych dla spolek z logu."}
+    ceny = ceny.ffill().bfill()   # 0-holdingowe dni maja i tak wage 0
+
+    # Ile sztuk kazdego dnia -> wartosc portfela dzien po dniu.
+    hold = holdings_timeline(txs, ceny.index).reindex(columns=ceny.columns, fill_value=0.0)
+    wartosc = (hold * ceny).sum(axis=1)
+
+    # Przeplywy: kazda transakcja to gotowka wlozona(+)/wyjeta(-) po cenie z dnia
+    # (pierwszy dzien notowan >= data transakcji).
+    flows = pd.Series(0.0, index=ceny.index)
+    for t in txs:
+        d = pd.Timestamp(t["executed_at"])
+        dni = ceny.index[ceny.index >= d]
+        if len(dni) == 0 or t["ticker"] not in ceny.columns:
+            continue
+        eff = dni[0]
+        znak = 1.0 if t["side"].upper() == "BUY" else -1.0
+        flows.loc[eff] += znak * t["quantity"] * float(ceny.loc[eff, t["ticker"]])
+
+    twr = twr_index(wartosc, flows)
+    if twr.empty:
+        return {"id": portfel.id, "name": portfel.name, "available": False,
+                "reason": "Log nie daje zadnego dnia z otwarta pozycja."}
+
+    # Benchmark (SPY) wyrownany do dni realnej sciezki, indeks od 100.
+    bench = close_series_range(BENCHMARK, start).reindex(twr.index).ffill().bfill()
+    bench_idx = bench / bench.iloc[0] * 100
+
+    # Rekoncyliacja: netto z logu vs obecne pozycje.
+    log_net: dict[str, float] = defaultdict(float)
+    for t in txs:
+        log_net[t["ticker"]] += (1.0 if t["side"].upper() == "BUY" else -1.0) * t["quantity"]
+    rek = reconcile_holdings(dict(log_net), _quantities_by_ticker(portfel.positions))
+
+    seria = [
+        {"time": d.strftime("%Y-%m-%d"),
+         "portfolio": round(float(twr.loc[d]), 2),
+         "benchmark": round(float(bench_idx.loc[d]), 2)}
+        for d in twr.index
+    ]
+    port_zwrot = round(float(twr.iloc[-1] - 100), 2)
+    bench_zwrot = round(float(bench_idx.iloc[-1] - 100), 2)
+
+    return {
+        "id": portfel.id,
+        "name": portfel.name,
+        "available": True,
+        "method": "TWR (time-weighted, przeplywy neutralizowane)",
+        "start_date": twr.index[0].strftime("%Y-%m-%d"),
+        "benchmark_ticker": BENCHMARK,
+        "portfolio_return_pct": port_zwrot,
+        "benchmark_return_pct": bench_zwrot,
+        "alpha_pct": round(port_zwrot - bench_zwrot, 2),
+        "reconciliation": rek,
+        "series": seria,
+    }
 
 
 # Korelacje miedzy spolkami w portfelu (na dziennych zwrotach).
