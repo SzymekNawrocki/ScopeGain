@@ -526,3 +526,67 @@ export async function getStockHistory(
   }
   return res.json();
 }
+
+// --- Wyszukiwanie i analiza spolki ---
+// Poczatek sciezki decyzyjnej: szukam -> ogladam. Wczesniej apka umiala tylko
+// to, co juz masz, a "rynek" wymagal znajomosci symbolu na pamiec.
+
+export type StockSearchHit = {
+  ticker: string;
+  name: string;
+  // Gielda ROZROZNIA cross-listing: CCJ (NYSE, USD) i CCO.TO (Toronto, CAD)
+  // to ta sama firma, ale inny papier. Bez tego pola user widzi dwa
+  // identyczne wiersze "Cameco Corporation" i nie wie, czym sie roznia.
+  exchange: string | null;
+  quote_type: string | null; // "EQUITY" | "ETF"
+  sector: string | null;
+  industry: string | null;
+};
+
+export type StockProfile = {
+  ticker: string;
+  name: string;
+  sector: string | null;
+  industry: string | null;
+  market_cap: number | null;
+  trailing_pe: number | null;
+  beta: number | null;
+  profit_margins: number | null;
+  currency: string | null;
+  summary: string | null;
+};
+
+// Werdykt RYZYKA - nie ocena spolki i nie sygnal kup/sprzedaj (ADR-0001).
+export type StockVerdict = {
+  ticker: string;
+  period: string;
+  grade: Severity; // uwaga: "good" = NISKIE RYZYKO (semantyka odwrocona)
+  grade_label: string; // "niskie ryzyko" | "podwyzszone ryzyko" | "wysokie ryzyko"
+  caveat: string;
+  data_gaps: string[]; // czego apka nie wiedziala
+  findings: VerdictFinding[];
+};
+
+// Podpowiedzi do wyszukiwarki (szukanie po NAZWIE, nie tylko po symbolu).
+export async function searchStocks(q: string): Promise<StockSearchHit[]> {
+  const res = await apiFetch(`/stock/search?q=${encodeURIComponent(q)}`);
+  if (!res.ok) throw new Error(await apiError(res));
+  return res.json();
+}
+
+export async function getStockProfile(ticker: string): Promise<StockProfile> {
+  const res = await apiFetch(`/stock/${encodeURIComponent(ticker)}/profile`);
+  if (!res.ok) throw new Error(await apiError(res));
+  return res.json();
+}
+
+export async function getStockVerdict(
+  ticker: string,
+  period: Period = "6mo",
+): Promise<StockVerdict> {
+  const res = await apiFetch(
+    `/stock/${encodeURIComponent(ticker)}/verdict?period=${period}`,
+  );
+  if (!res.ok) throw new Error(await apiError(res));
+  return res.json();
+}

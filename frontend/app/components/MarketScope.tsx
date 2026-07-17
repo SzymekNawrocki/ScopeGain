@@ -1,87 +1,86 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   getStockHistory,
   getStockMetrics,
+  getStockProfile,
+  getStockVerdict,
   PERIODS,
   Period,
   StockHistory,
   StockMetrics,
+  StockProfile,
+  StockVerdict,
 } from "../lib/api";
 import { PriceChart } from "./PriceChart";
+import { SearchBox } from "./SearchBox";
+import { StockProfilePanel } from "./StockProfilePanel";
 import { TerminalWindow } from "./ui/TerminalWindow";
 import { StatTile } from "./ui/StatTile";
 import { StatusPanel } from "./ui/StatusPanel";
+import { VerdictFindings } from "./ui/VerdictFindings";
 import { pnlColor, withSign } from "../lib/format";
 
-// Sekcja "market scope": pole na ticker + wybor zakresu + wykres swiecowy.
-// Cala logika (fetch, stany) zyje tu; PriceChart tylko maluje wynik.
+// Sekcja "market scope": szukasz spolki -> apka mowi, czym ona jest, czym
+// ryzykujesz i jak sie zachowywala. Ten komponent tylko ORKIESTRUJE (pobiera
+// i rozdaje), a maluja: SearchBox, StockProfilePanel, VerdictFindings,
+// PriceChart.
 export function MarketScope() {
-  const [query, setQuery] = useState("AAPL"); // to, co user wpisuje
-  const [ticker, setTicker] = useState("AAPL"); // aktywnie pobrana spolka
+  const [ticker, setTicker] = useState("AAPL"); // aktywnie ogladana spolka
   const [period, setPeriod] = useState<Period>("6mo");
 
   const [data, setData] = useState<StockHistory | null>(null);
   const [metrics, setMetrics] = useState<StockMetrics | null>(null);
+  const [profile, setProfile] = useState<StockProfile | null>(null);
+  const [verdict, setVerdict] = useState<StockVerdict | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Pobierz historie ORAZ metryki za kazdym razem, gdy zmieni sie spolka/zakres.
-  // Dwa niezalezne strzaly - wykres i statystyki moga dojsc w innym tempie.
+  // Cztery niezalezne strzaly - kazdy moze dojsc w innym tempie i kazdy moze
+  // zawiesc osobno. Wykres jest krytyczny (jego blad widac), profil i werdykt
+  // sa dodatkiem: gdy zrodlo odmowi fundamentow, reszta ma dzialac dalej.
   useEffect(() => {
     let aktualne = true; // straznik: ignoruj odpowiedz starego zapytania
     setLoading(true);
     setError(null);
 
     getStockHistory(ticker, period)
-      .then((h) => {
-        if (aktualne) setData(h);
-      })
+      .then((h) => aktualne && setData(h))
       .catch((e) => {
         if (aktualne) {
           setError(e.message ?? "Blad pobierania");
           setData(null);
         }
       })
-      .finally(() => {
-        if (aktualne) setLoading(false);
-      });
+      .finally(() => aktualne && setLoading(false));
 
     getStockMetrics(ticker, period)
       .then((m) => aktualne && setMetrics(m))
       .catch(() => aktualne && setMetrics(null));
+
+    getStockProfile(ticker)
+      .then((p) => aktualne && setProfile(p))
+      .catch(() => aktualne && setProfile(null));
+
+    getStockVerdict(ticker, period)
+      .then((v) => aktualne && setVerdict(v))
+      .catch(() => aktualne && setVerdict(null));
 
     return () => {
       aktualne = false; // odpowiedz przyjdzie za pozno -> odrzuc ja
     };
   }, [ticker, period]);
 
-  // Enter w polu -> ustaw nowa spolke (effect wyzej sam dociagnie dane).
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    const t = query.trim().toUpperCase();
-    if (t) setTicker(t);
-  }
+  const swiezyProfil = profile && profile.ticker === ticker;
+  const swiezyWerdykt = verdict && verdict.ticker === ticker && verdict.period === period;
 
   return (
     <div className="mb-12">
       <TerminalWindow title={`~/market/${ticker}`}>
-        {/* Sterowanie: pole na ticker + przyciski zakresu */}
+        {/* Sterowanie: wyszukiwarka + zakres */}
         <div className="mb-5 flex flex-wrap items-center gap-4">
-          <form onSubmit={onSubmit} className="relative">
-            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-mono text-accent">
-              &gt;
-            </span>
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              spellCheck={false}
-              aria-label="Symbol spolki"
-              placeholder="AAPL"
-              className="cyber-chamfer-sm w-40 border border-border bg-[#12121a] py-2 pl-8 pr-3 font-mono text-sm uppercase text-accent outline-none transition-all placeholder:text-muted-foreground focus:border-accent focus:shadow-glow"
-            />
-          </form>
+          <SearchBox value={ticker} onPick={setTicker} />
 
           <div className="flex gap-1">
             {PERIODS.map((p) => (
@@ -100,6 +99,23 @@ export function MarketScope() {
           </div>
         </div>
 
+        {/* PROFIL - czym ta spolka jest (przed liczbami) */}
+        {swiezyProfil && <StockProfilePanel profile={profile} />}
+
+        {/* WERDYKT RYZYKA - wniosek najpierw, jak w reszcie apki.
+            To NIE porada zakupu (ADR-0001): etykieta mowi o ryzyku, a
+            zastrzezenie i braki danych ida razem z werdyktem. */}
+        {swiezyWerdykt && (
+          <VerdictFindings
+            title={`Ryzyko — ${ticker} (${period})`}
+            grade={verdict.grade}
+            gradeLabel={verdict.grade_label}
+            findings={verdict.findings}
+            caveat={verdict.caveat}
+            dataGaps={verdict.data_gaps}
+          />
+        )}
+
         {/* Naglowek wykresu: spolka + ostatnie zamkniecie */}
         <div className="mb-3 flex items-baseline gap-3">
           <h2 className="font-display text-2xl font-bold uppercase tracking-wide text-foreground">
@@ -112,7 +128,8 @@ export function MarketScope() {
           )}
         </div>
 
-        {/* Panel metryk quant (warstwa 6): zwrot, ryzyko, ja vs rynek */}
+        {/* Panel metryk quant: zwrot, ryzyko, ja vs rynek. Kazda liczba
+            tlumaczy sama siebie przez dymek (term=...). */}
         {metrics && metrics.ticker === ticker && (
           <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
             <StatTile
@@ -124,16 +141,19 @@ export function MarketScope() {
               label="Zmiennosc (rok)"
               value={`${metrics.volatility_pct.toFixed(2)}%`}
               className="text-accent-tertiary"
+              term="zmiennosc"
             />
             <StatTile
               label="Max drawdown"
               value={`${metrics.max_drawdown_pct.toFixed(2)}%`}
               className="text-destructive"
+              term="drawdown"
             />
             <StatTile
               label={`vs ${metrics.benchmark.ticker}`}
               value={metrics.alpha_pct != null ? `${withSign(metrics.alpha_pct)}%` : "—"}
               className={pnlColor(metrics.alpha_pct)}
+              term="alpha"
               hint={
                 metrics.benchmark.return_pct != null
                   ? `rynek ${withSign(metrics.benchmark.return_pct)}%`
@@ -146,7 +166,7 @@ export function MarketScope() {
         {/* Stany: blad / ladowanie / wykres */}
         {error ? (
           <StatusPanel variant="error">
-            <p className="mb-1 uppercase tracking-[0.2em]">// signal lost</p>
+            <p className="mb-1 uppercase tracking-[0.2em]">{"// signal lost"}</p>
             <p className="text-foreground">{error}</p>
           </StatusPanel>
         ) : (
