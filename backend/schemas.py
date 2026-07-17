@@ -185,3 +185,52 @@ class RebalancePlan(BaseModel):
     target: str              # "equal" - rowne wagi jako neutralny punkt odniesienia
     legs: list[RebalanceLeg]
     cost: RebalanceCost
+
+
+# --- WYSZUKIWANIE I ANALIZA SPOLKI ---
+# Poczatek sciezki decyzyjnej: szukam -> ogladam -> (dopiero potem) kupuje.
+# Do tej pory apka umiala tylko to, co juz masz.
+
+class StockSearchHit(BaseModel):
+    ticker: str
+    name: str
+    # Gielda ROZROZNIA cross-listing: CCJ (NYSE) i CCO.TO (Toronto) to ta sama
+    # firma, ale rozne papiery, waluty i metryki. Bez tego pola user nie
+    # odroznilby dwoch identycznie nazwanych wynikow.
+    exchange: str | None = None
+    quote_type: str | None = None   # "EQUITY" | "ETF"
+    sector: str | None = None
+    industry: str | None = None
+
+
+class StockProfile(BaseModel):
+    """Czym ta spolka JEST. Bez 'period' - fundamenty nie zaleza od zakresu
+    wykresu, wiec trasa jest osobna od werdyktu (i cache'owana na 12 h)."""
+    ticker: str
+    name: str
+    sector: str | None = None
+    industry: str | None = None
+    market_cap: float | None = None
+    trailing_pe: float | None = None
+    beta: float | None = None
+    profit_margins: float | None = None
+    currency: str | None = None
+    summary: str | None = None
+
+
+class VerdictFinding(BaseModel):
+    severity: str            # "good" | "warn" | "bad"
+    title: str
+    detail: str
+
+
+class StockVerdict(BaseModel):
+    """Werdykt RYZYKA - nie ocena spolki i nie sygnal kup/sprzedaj (ADR-0001).
+    Etykieta zawsze mowi o ryzyku; 'mocny/slaby' czytaloby sie jak porada."""
+    ticker: str
+    period: str
+    grade: str               # "good" = niskie ryzyko (semantyka odwrocona!)
+    grade_label: str         # "niskie ryzyko" | "podwyzszone ryzyko" | "wysokie ryzyko"
+    caveat: str              # jawne zastrzezenie - zawsze przy werdykcie
+    data_gaps: list[str]     # czego zabraklo; werdykt z 2 regul != werdykt z 5
+    findings: list[VerdictFinding]
