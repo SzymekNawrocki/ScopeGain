@@ -7,7 +7,14 @@ osobno (good/warn/bad) i sama agregacje do oceny koncowej.
 
 import pytest
 
-from analysis import BAD, GOOD, WARN, build_behavior_verdict, build_verdict
+from analysis import (
+    BAD,
+    GOOD,
+    WARN,
+    build_behavior_verdict,
+    build_stock_verdict,
+    build_verdict,
+)
 
 
 def all_good_kwargs() -> dict:
@@ -231,3 +238,200 @@ def test_behavior_skips_rows_without_current_price():
 def test_behavior_always_includes_honest_caveat():
     v = build_behavior_verdict([_sell("AAPL", 100.0, 130.0)])
     assert "gotowka" in v["caveat"]
+
+
+# --- werdykt RYZYKA pojedynczej spolki --------------------------------------
+# Uwaga na ODWROCONA semantyke: tu GOOD = niskie ryzyko, BAD = wysokie.
+
+def all_low_risk_kwargs() -> dict:
+    return dict(
+        ticker="AAPL",
+        bench_label="SPY",
+        volatility_pct=20.0,
+        bench_vol=20.0,      # ratio 1.0 -> GOOD
+        max_drawdown_pct=-10.0,
+        beta=1.0,
+        trailing_pe=20.0,
+        profit_margins=0.25,
+    )
+
+
+# --- zmiennosc vs rynek ---
+
+def test_stock_vol_good_at_or_below_1_2x():
+    v = build_stock_verdict(**{**all_low_risk_kwargs(), "volatility_pct": 24.0})
+    assert severities(v)[0] == GOOD
+
+
+def test_stock_vol_warn_above_1_2x():
+    v = build_stock_verdict(**{**all_low_risk_kwargs(), "volatility_pct": 30.0})
+    assert severities(v)[0] == WARN
+
+
+def test_stock_vol_bad_above_1_8x():
+    v = build_stock_verdict(**{**all_low_risk_kwargs(), "volatility_pct": 40.0})
+    assert severities(v)[0] == BAD
+
+
+def test_stock_vol_skipped_when_no_benchmark():
+    v = build_stock_verdict(**{**all_low_risk_kwargs(), "bench_vol": 0.0})
+    assert "zmiennosc rynku" in v["data_gaps"]
+
+
+# --- max drawdown ---
+
+def test_stock_drawdown_good_above_minus_20():
+    v = build_stock_verdict(**{**all_low_risk_kwargs(), "max_drawdown_pct": -19.0})
+    assert severities(v)[1] == GOOD
+
+
+def test_stock_drawdown_warn_between_20_and_40():
+    v = build_stock_verdict(**{**all_low_risk_kwargs(), "max_drawdown_pct": -40.0})
+    assert severities(v)[1] == WARN
+
+
+def test_stock_drawdown_bad_below_minus_40():
+    v = build_stock_verdict(**{**all_low_risk_kwargs(), "max_drawdown_pct": -72.0})
+    assert severities(v)[1] == BAD
+
+
+# --- beta ---
+
+def test_stock_beta_good_at_or_below_1_1():
+    v = build_stock_verdict(**{**all_low_risk_kwargs(), "beta": 1.1})
+    assert severities(v)[2] == GOOD
+
+
+def test_stock_low_beta_is_not_described_as_moving_like_market():
+    """Beta 0.35 (realnie Coca-Cola) znaczy 'rusza sie DUZO slabiej', a nie
+    'mniej wiecej jak rynek' - tekst musi to rozroznic."""
+    v = build_stock_verdict(**{**all_low_risk_kwargs(), "beta": 0.35})
+    assert severities(v)[2] == GOOD
+    assert v["findings"][2]["title"] == "Slabiej reaguje na rynek"
+
+
+def test_stock_beta_does_not_claim_calm():
+    """Beta to ruch RAZEM Z RYNKIEM, nie spokoj: spolka moze bujac 4x mocniej
+    niz rynek i miec bete 1.0 (buja na wlasny rachunek - realnie Cameco).
+    Nazwanie tego 'spokojna' przeczyloby regule zmiennosci na tym samym
+    ekranie."""
+    v = build_stock_verdict(**{
+        **all_low_risk_kwargs(), "volatility_pct": 56.0, "bench_vol": 13.0,
+        "beta": 1.0,
+    })
+    assert severities(v)[0] == BAD                    # buja duzo mocniej
+    assert "Spokojna" not in v["findings"][2]["title"]  # ...wiec nie "spokojna"
+
+
+def test_stock_beta_warn_above_1_1():
+    v = build_stock_verdict(**{**all_low_risk_kwargs(), "beta": 1.4})
+    assert severities(v)[2] == WARN
+
+
+def test_stock_beta_bad_above_1_5():
+    v = build_stock_verdict(**{**all_low_risk_kwargs(), "beta": 2.0})
+    assert severities(v)[2] == BAD
+
+
+def test_stock_beta_none_goes_to_data_gaps():
+    v = build_stock_verdict(**{**all_low_risk_kwargs(), "beta": None})
+    assert "beta" in v["data_gaps"]
+    assert len(v["findings"]) == 4  # regula pominieta, reszta liczy sie dalej
+
+
+# --- marza zysku ---
+
+def test_stock_margins_good_above_10_pct():
+    v = build_stock_verdict(**{**all_low_risk_kwargs(), "profit_margins": 0.11})
+    assert severities(v)[3] == GOOD
+
+
+def test_stock_margins_warn_when_thin():
+    v = build_stock_verdict(**{**all_low_risk_kwargs(), "profit_margins": 0.02})
+    assert severities(v)[3] == WARN
+
+
+def test_stock_margins_bad_when_negative():
+    v = build_stock_verdict(**{**all_low_risk_kwargs(), "profit_margins": -0.3})
+    assert severities(v)[3] == BAD
+
+
+# --- P/E (ryzyko wyceny) ---
+
+def test_stock_pe_good_at_or_below_25():
+    v = build_stock_verdict(**{**all_low_risk_kwargs(), "trailing_pe": 25.0})
+    assert severities(v)[4] == GOOD
+
+
+def test_stock_pe_warn_above_25():
+    v = build_stock_verdict(**{**all_low_risk_kwargs(), "trailing_pe": 40.0})
+    assert severities(v)[4] == WARN
+
+
+def test_stock_pe_bad_above_50():
+    # Cameco realnie mial P/E 83 - w cenie siedza duze oczekiwania.
+    v = build_stock_verdict(**{**all_low_risk_kwargs(), "trailing_pe": 83.2})
+    assert severities(v)[4] == BAD
+
+
+def test_stock_pe_none_goes_to_data_gaps():
+    v = build_stock_verdict(**{**all_low_risk_kwargs(), "trailing_pe": None})
+    assert "P/E" in v["data_gaps"]
+
+
+def test_stock_pe_zero_or_negative_is_missing_not_bad():
+    """yfinance NIE odroznia 'spolka nie ma zysku' od 'Yahoo nie podalo'.
+    Zgadywanie ktorejkolwiek wersji byloby klamstwem - mowimy 'nie wiem'."""
+    v = build_stock_verdict(**{**all_low_risk_kwargs(), "trailing_pe": -12.0})
+    assert "P/E" in v["data_gaps"]
+    assert len(v["findings"]) == 4
+
+
+# --- ocena laczna ---
+
+def test_stock_grade_low_risk_when_all_calm():
+    v = build_stock_verdict(**all_low_risk_kwargs())
+    assert v["grade"] == GOOD
+    assert v["grade_label"] == "niskie ryzyko"
+
+
+def test_stock_grade_high_risk_when_everything_screams():
+    v = build_stock_verdict(**{
+        **all_low_risk_kwargs(),
+        "volatility_pct": 60.0, "max_drawdown_pct": -72.0,
+        "beta": 2.1, "profit_margins": -0.4, "trailing_pe": 90.0,
+    })
+    assert v["grade"] == BAD
+    assert v["grade_label"] == "wysokie ryzyko"
+
+
+# --- straznicy uczciwosci (ADR-0001) ---
+
+def test_stock_verdict_label_always_speaks_about_risk():
+    """STRAZNIK ADR-0001. Apka nie wydaje zlecen kup/sprzedaj. Werdykt o
+    POJEDYNCZEJ spolce etykietowany jakoscia ("mocny") czyta sie jak
+    rekomendacja zakupu - dlatego etykieta MUSI mowic o ryzyku. Ten test
+    ma paść, gdyby ktos kiedys skopiowal tu slownik z werdyktu portfela."""
+    warianty = [
+        all_low_risk_kwargs(),
+        {**all_low_risk_kwargs(), "beta": 1.4},
+        {**all_low_risk_kwargs(), "volatility_pct": 60.0, "max_drawdown_pct": -72.0,
+         "beta": 2.1, "profit_margins": -0.4, "trailing_pe": 90.0},
+    ]
+    for kw in warianty:
+        assert "ryzyko" in build_stock_verdict(**kw)["grade_label"]
+
+
+def test_stock_verdict_always_includes_caveat():
+    v = build_stock_verdict(**all_low_risk_kwargs())
+    assert "kup/sprzedaj" in v["caveat"]
+
+
+def test_stock_verdict_reports_data_gaps_honestly():
+    """Werdykt z 2 regul nie moze wygladac tak samo pewnie jak z 5."""
+    v = build_stock_verdict(**{
+        **all_low_risk_kwargs(),
+        "beta": None, "trailing_pe": None, "profit_margins": None,
+    })
+    assert set(v["data_gaps"]) == {"beta", "marza zysku", "P/E"}
+    assert len(v["findings"]) == 2

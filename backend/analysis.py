@@ -99,6 +99,151 @@ def build_verdict(
     return {"grade": grade, "grade_label": label, "findings": f}
 
 
+# --- Werdykt RYZYKA pojedynczej spolki -------------------------------------
+# Uwaga na granice (ADR-0001): apka NIE mowi "kup/sprzedaj". Werdykt portfela
+# wyzej ocenia JAKOSC ("mocny/przecietny/slaby") - o Twoim wlasnym portfelu to
+# uczciwe. Przeniesienie tego slownika na pojedyncza spolke bylby zlamaniem
+# ADR-0001 tylnymi drzwiami: "Cameco: MOCNY" czyta sie jak polecenie zakupu.
+# Dlatego tutaj oceniamy WYLACZNIE RYZYKO i etykietujemy je ryzykiem.
+
+# ODWROCONA semantyka severity - w tej funkcji (i tylko w niej):
+#   GOOD = niskie ryzyko, BAD = wysokie ryzyko.
+# Dzieki tej inwersji ta sama arytmetyka punktow co wyzej dziala bez zmian.
+
+STOCK_VERDICT_CAVEAT = (
+    "To ocena RYZYKA (jak mocno buja, jak gleboko spadala, jak wrazliwa na "
+    "rynek) - nie ocena spolki i nie sygnal kup/sprzedaj. Liczymy z przeszlosci; "
+    "fundamenty pochodza z darmowego zrodla i bywaja niepelne."
+)
+
+
+def build_stock_verdict(
+    *,
+    ticker: str,
+    bench_label: str,
+    volatility_pct: float,
+    bench_vol: float,
+    max_drawdown_pct: float,
+    beta: float | None = None,
+    trailing_pe: float | None = None,
+    profit_margins: float | None = None,
+) -> dict:
+    """Werdykt RYZYKA jednej spolki. Zwraca {grade, grade_label, caveat,
+    data_gaps, findings}.
+
+    CELOWO NIE przyjmuje zwrotu ani alphy. "Bije rynek -> +1 punkt" przemycilby
+    z powrotem ocene JAKOSCI i cicho zamienil ten werdykt w rekomendacje.
+    Zwrot i alpha sa userowi pokazywane obok, jako kontekst - ale nie wchodza
+    do oceny ryzyka.
+
+    data_gaps: nazwy metryk, ktorych nie bylo. Bez tego werdykt policzony z
+    2 regul wygladalby tak samo pewnie jak z 5 - a to by bylo klamstwo przez
+    przemilczenie.
+    """
+    f: list[dict] = []
+    braki: list[str] = []
+
+    # 1. Zmiennosc vs rynek. Najbardziej wiarygodna regula - liczymy ja SAMI
+    #    z cen, nie ufamy niczyim fundamentom.
+    if bench_vol > 0:
+        ile_razy = volatility_pct / bench_vol
+        if ile_razy <= 1.2:
+            f.append(_wniosek(GOOD, "Buja jak rynek",
+                              f"Zmiennosc {volatility_pct:.0f}% vs {bench_vol:.0f}% dla {bench_label}."))
+        elif ile_razy <= 1.8:
+            f.append(_wniosek(WARN, "Buja mocniej niz rynek",
+                              f"Zmiennosc {volatility_pct:.0f}% to {ile_razy:.1f}x rynek ({bench_vol:.0f}%)."))
+        else:
+            f.append(_wniosek(BAD, "Buja duzo mocniej niz rynek",
+                              f"Zmiennosc {volatility_pct:.0f}% to az {ile_razy:.1f}x rynek ({bench_vol:.0f}%)."))
+    else:
+        braki.append("zmiennosc rynku")
+
+    # 2. Max drawdown - ile spolka juz realnie potrafila stracic od szczytu.
+    if max_drawdown_pct > -20:
+        f.append(_wniosek(GOOD, "Plytkie obsuniecia",
+                          f"Najgorszy zjazd od szczytu: {max_drawdown_pct:.0f}%."))
+    elif max_drawdown_pct >= -40:
+        f.append(_wniosek(WARN, "Spore obsuniecie w historii",
+                          f"Najgorszy zjazd od szczytu: {max_drawdown_pct:.0f}%."))
+    else:
+        f.append(_wniosek(BAD, "Bardzo gleboki zjazd w historii",
+                          f"Najgorszy zjazd od szczytu: {max_drawdown_pct:.0f}% - "
+                          f"tyle juz raz zabralo."))
+
+    # 3. Beta - jak mocno spolka rusza sie RAZEM Z RYNKIEM. To NIE to samo co
+    #    zmiennosc wyzej: beta = korelacja x stosunek zmiennosci, wiec spolka
+    #    moze bujac 4x mocniej niz rynek i miec bete 1.0, jesli buja na WLASNY
+    #    rachunek (slaba korelacja). Dlatego mowimy tu wylacznie o ruchu z
+    #    rynkiem - nazwanie niskiej bety "spokojna" przeczyloby regule 1.
+    if beta is None:
+        braki.append("beta")
+    else:
+        ruch = f"gdy rynek spada 10%, ta spolka srednio {beta * 10:.0f}%"
+        if beta < 0.8:
+            f.append(_wniosek(GOOD, "Slabiej reaguje na rynek",
+                              f"Beta {beta:.2f} - {ruch}."))
+        elif beta <= 1.1:
+            f.append(_wniosek(GOOD, "Rusza sie jak rynek",
+                              f"Beta {beta:.2f} - {ruch}."))
+        elif beta <= 1.5:
+            f.append(_wniosek(WARN, "Reaguje mocniej niz rynek",
+                              f"Beta {beta:.2f} - {ruch}."))
+        else:
+            f.append(_wniosek(BAD, "Mocno rozhustana rynkiem",
+                              f"Beta {beta:.2f} - {ruch}."))
+
+    # 4. Marza zysku - jako RYZYKO FINANSOWE, nie jako "jakosc biznesu".
+    #    Spolka, ktora traci pieniadze, moze potrzebowac finansowania.
+    if profit_margins is None:
+        braki.append("marza zysku")
+    elif profit_margins > 0.10:
+        f.append(_wniosek(GOOD, "Zarabia z zapasem",
+                          f"Marza zysku {profit_margins * 100:.0f}% - zysk amortyzuje szoki."))
+    elif profit_margins >= 0:
+        f.append(_wniosek(WARN, "Cienka marza",
+                          f"Marza zysku {profit_margins * 100:.1f}% - maly bufor na gorsze czasy."))
+    else:
+        f.append(_wniosek(BAD, "Spolka traci pieniadze",
+                          f"Marza zysku {profit_margins * 100:.0f}% - ryzyko finansowania."))
+
+    # 5. P/E jako RYZYKO WYCENY: wysokie P/E = w cenie siedza duze oczekiwania
+    #    = boleśniejszy spadek, gdy sie nie spelnia.
+    #    UWAGA: yfinance NIE odroznia "spolka nie ma zysku" od "Yahoo nie
+    #    podalo" - obie sytuacje to None. To dwie rozne informacje o ryzyku,
+    #    wiec NIE zgadujemy: pomijamy regule i mowimy o tym wprost.
+    if trailing_pe is None or trailing_pe <= 0:
+        braki.append("P/E")
+    elif trailing_pe <= 25:
+        f.append(_wniosek(GOOD, "Wycena bez wielkich oczekiwan",
+                          f"P/E {trailing_pe:.0f} - cena nie zaklada cudow."))
+    elif trailing_pe <= 50:
+        f.append(_wniosek(WARN, "Wysoka wycena",
+                          f"P/E {trailing_pe:.0f} - w cenie siedza spore oczekiwania."))
+    else:
+        f.append(_wniosek(BAD, "Bardzo wysoka wycena",
+                          f"P/E {trailing_pe:.0f} - w cenie siedza duze oczekiwania; "
+                          f"rozczarowanie boli podwojnie."))
+
+    # Ta sama arytmetyka co w build_verdict - dziala dzieki inwersji severity.
+    punkty = sum({GOOD: 1, WARN: 0, BAD: -1}[w["severity"]] for w in f)
+    if punkty >= 2:
+        grade, label = GOOD, "niskie ryzyko"
+    elif punkty >= 0:
+        grade, label = WARN, "podwyzszone ryzyko"
+    else:
+        grade, label = BAD, "wysokie ryzyko"
+
+    return {
+        "ticker": ticker.upper(),
+        "grade": grade,
+        "grade_label": label,
+        "caveat": STOCK_VERDICT_CAVEAT,
+        "data_gaps": braki,
+        "findings": f,
+    }
+
+
 # Prog "istotnej" zmiany po sprzedazy: ponizej +/- tej wartosci uznajemy timing
 # za neutralny (szum), a nie sygnal behawioralny.
 BEHAVIOR_MOVE_PCT = 10.0
