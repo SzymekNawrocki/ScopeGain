@@ -8,7 +8,6 @@ import { RealPerformanceReport } from "./RealPerformanceReport";
 import { RiskReport } from "./RiskReport";
 import { BehaviorReport } from "./BehaviorReport";
 import { RebalanceReport } from "./RebalanceReport";
-import { HowItWorks } from "./HowItWorks";
 import { SectionLabel } from "./ui/SectionLabel";
 
 // Podtytul pod terminalowa etykieta: komenda zostaje (sygnatura apki), ale obok
@@ -41,8 +40,6 @@ export function PortfolioWorkspace() {
 
   return (
     <div className="space-y-14">
-      <HowItWorks />
-
       {/* Portfele: nowy portfel + karty pozycji. Sam obsluguje stany
           ladowania / bledu / pustki. */}
       <section>

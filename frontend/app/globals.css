@@ -47,6 +47,23 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Tailwind v4 nie daje juz przyciskom kursora-lapki - dokladamy go globalnie,
+   zeby wszystko klikalne wygladalo na klikalne. Wylaczone (disabled) dostaja
+   kursor "nie wolno". Nieulayerowana regula wygrywa z preflightem Tailwinda. */
+button:not(:disabled),
+[role="button"]:not(:disabled),
+[type="button"]:not(:disabled),
+[type="submit"]:not(:disabled),
+label[for],
+summary {
+  cursor: pointer;
+}
+button:disabled,
+[type="button"]:disabled,
+[type="submit"]:disabled {
+  cursor: not-allowed;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

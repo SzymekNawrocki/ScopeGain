@@ -4,6 +4,7 @@ import { WorkspaceBody } from "./components/WorkspaceBody";
 import { AuthProvider } from "./components/AuthProvider";
 import { AuthGate } from "./components/AuthGate";
 import { Nav } from "./components/Nav";
+import { HowItWorks } from "./components/HowItWorks";
 
 // Server Component: powloka strony (naglowek) nie ma stanu, wiec renderuje sie
 // na serwerze. Interaktywne granice to providery kliencke:
@@ -27,9 +28,9 @@ export default function Dashboard() {
             <h1 className="font-display text-6xl font-black uppercase tracking-widest text-foreground sm:text-7xl">
               ScopeGain
             </h1>
-            <p className="mt-4 max-w-xl font-mono text-base leading-relaxed text-muted-foreground">
-              Narzedzie do myslenia o inwestycjach: szukaj spolek, sprawdzaj ryzyko i
-              policz realny zysk swojego portfela — na zywo z rynku.
+            <p className="mt-4 max-w-2xl font-mono text-base leading-relaxed text-muted-foreground">
+              Twój dziennik inwestora: zapisujesz swoje decyzje, a apka pamięta je,
+              uczciwie liczy Twój realny zysk i ryzyko — i nie zmyśla.
               <span className="cursor-blink" />
             </p>
           </header>
@@ -37,6 +38,8 @@ export default function Dashboard() {
           {/* Brama: niezalogowany widzi ekran logowania; reszta (i chronione API)
               renderuje sie dopiero po zalogowaniu. */}
           <AuthGate>
+            {/* Instrukcja dla nowego uzytkownika - widoczna na kazdej zakladce */}
+            <HowItWorks />
             <PortfoliosProvider>
               <WorkspaceBody />
             </PortfoliosProvider>
