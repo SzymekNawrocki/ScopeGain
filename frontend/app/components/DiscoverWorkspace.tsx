@@ -36,15 +36,15 @@ export function DiscoverWorkspace() {
     <section>
       <SectionLabel>./discover --scope</SectionLabel>
       <p className="mb-5 max-w-2xl font-mono text-sm leading-relaxed text-muted-foreground">
-        Znajdz spolki bez znajomosci symbolu:{" "}
-        <span className="text-foreground">przegladaj po kategorii</span> (branza lub sklad
-        ETF) albo <span className="text-foreground">szukaj po nazwie</span>. Kandydatow
-        skladasz w <span className="text-accent">Temat</span> — to Ty decydujesz, kto wchodzi.
+        Znajdź spółki bez znajomości symbolu:{" "}
+        <span className="text-foreground">przeglądaj po kategorii</span> (branża lub skład
+        ETF) albo <span className="text-foreground">szukaj po nazwie</span>. Kandydatów
+        składasz w <span className="text-accent">Temat</span> — to Ty decydujesz, kto wchodzi.
       </p>
 
       <div className="mb-5 flex gap-1">
         <button onClick={() => setMode("browse")} className={chip(mode === "browse")}>
-          przegladaj
+          przeglądaj
         </button>
         <button onClick={() => setMode("search")} className={chip(mode === "search")}>
           szukaj po nazwie
@@ -128,7 +128,7 @@ function BrowsePanel() {
   const currentOrigin = etfLabel
     ? `ETF: ${etfLabel}`
     : industry
-    ? `branza: ${industry.name}`
+    ? `branża: ${industry.name}`
     : "";
 
   function openAdd(c: DiscoverCompany) {
@@ -154,7 +154,7 @@ function BrowsePanel() {
       {industries.length > 0 && (
         <>
           <p className="mb-2 font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
-            Branza
+            Branża
           </p>
           <div className="mb-4 flex flex-wrap gap-1">
             {industries.map((i) => (
@@ -179,7 +179,7 @@ function BrowsePanel() {
           className="cyber-chamfer-sm w-32 border border-border bg-[#0a0a0f] px-2 py-1 font-mono text-sm uppercase text-accent outline-none focus:border-accent"
         />
         <button type="submit" className={chip(false)}>
-          pokaz sklad
+          pokaż skład
         </button>
       </form>
 
@@ -187,8 +187,8 @@ function BrowsePanel() {
       {industry && (
         <div className="cyber-chamfer-sm mb-4 border border-[#ffcc00]/50 bg-[#ffcc00]/5 px-4 py-3">
           <p className="font-mono text-xs leading-relaxed text-[#ffcc00]">
-            ⚠ To ranking „top" Yahoo dla branzy <span className="font-bold">{industry.name}</span>,
-            NIE pelny spis — moze pomijac liderow (np. Cameco przy uranie). Luki uzupelnij
+            ⚠ To ranking „top" Yahoo dla branży <span className="font-bold">{industry.name}</span>,
+            NIE pełny spis — może pomijać liderów (np. Cameco przy uranie). Luki uzupełnij
             szukaniem po nazwie albo rozbiciem ETF.
           </p>
         </div>
@@ -235,8 +235,8 @@ function BrowsePanel() {
         </ul>
       ) : (
         <p className="font-mono text-sm text-muted-foreground">
-          <span className="text-accent">$</span> wybierz sektor i branze albo rozbij ETF,
-          zeby zobaczyc kandydatow.
+          <span className="text-accent">$</span> wybierz sektor i branżę albo rozbij ETF,
+          żeby zobaczyć kandydatów.
         </p>
       )}
     </TerminalWindow>

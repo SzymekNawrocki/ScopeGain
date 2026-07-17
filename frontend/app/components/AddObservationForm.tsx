@@ -60,7 +60,7 @@ export function AddObservationForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const origin = candidate?.origin ?? "recznie";
+  const origin = candidate?.origin ?? "ręcznie";
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -68,19 +68,19 @@ export function AddObservationForm({
 
     const tick = ticker.trim().toUpperCase();
     const nm = name.trim() || tick;
-    if (!tick) return setError("Podaj ticker spolki.");
-    if (!thesis.trim()) return setError("Teza jest obowiazkowa — dlaczego to dodajesz?");
+    if (!tick) return setError("Podaj ticker spółki.");
+    if (!thesis.trim()) return setError("Teza jest obowiązkowa — dlaczego to dodajesz?");
 
     const price = parseFloat(invalPrice);
     if (invalMode === "price" && !(price > 0))
-      return setError("Podaj cene progu uniewaznienia (> 0) albo przelacz na warunek.");
+      return setError("Podaj cenę progu unieważnienia (> 0) albo przełącz na warunek.");
     if (invalMode === "note" && !invalNote.trim())
-      return setError("Opisz warunek uniewaznienia albo przelacz na cene.");
+      return setError("Opisz warunek unieważnienia albo przełącz na cenę.");
 
     // Ustal temat: istniejacy albo utworz nowy.
     let themeId = fixedThemeId ?? (typeof target === "number" ? target : null);
     if (themeId == null && target !== "new")
-      return setError("Wybierz temat albo utworz nowy.");
+      return setError("Wybierz temat albo utwórz nowy.");
 
     setBusy(true);
     try {
@@ -188,7 +188,7 @@ export function AddObservationForm({
         <textarea
           value={thesis}
           onChange={(e) => setThesis(e.target.value)}
-          placeholder="np. deficyt podazy uranu, kontrakty dlugoterminowe reaktorow"
+          placeholder="np. deficyt podaży uranu, kontrakty długoterminowe reaktorów"
           rows={2}
           className={`${inputCls} w-full resize-y`}
         />
@@ -197,7 +197,7 @@ export function AddObservationForm({
       {/* Uniewaznienie: cena LUB warunek */}
       <div>
         <p className="mb-1.5 font-mono text-[11px] uppercase tracking-[0.15em] text-muted-foreground">
-          Uniewaznienie — przy czym uznam, ze sie myle
+          Unieważnienie — przy czym uznam, że się mylę
         </p>
         <div className="mb-2 flex gap-1">
           <button type="button" onClick={() => setInvalMode("price")} className={chip(invalMode === "price")}>
@@ -211,7 +211,7 @@ export function AddObservationForm({
           <input
             value={invalPrice}
             onChange={(e) => setInvalPrice(e.target.value)}
-            placeholder="np. 55 (spadek ponizej = mylilem sie)"
+            placeholder="np. 55 (spadek poniżej = myliłem się)"
             inputMode="decimal"
             className={`${inputCls} w-full`}
           />
@@ -219,7 +219,7 @@ export function AddObservationForm({
           <textarea
             value={invalNote}
             onChange={(e) => setInvalNote(e.target.value)}
-            placeholder="np. jesli deficyt uranu sie nie zmaterializuje do 2027"
+            placeholder="np. jeśli deficyt uranu się nie zmaterializuje do 2027"
             rows={2}
             className={`${inputCls} w-full resize-y`}
           />
@@ -229,12 +229,12 @@ export function AddObservationForm({
       {/* Wejscie - opcjonalne (nie gonic kursu) */}
       <div>
         <p className="mb-1.5 font-mono text-[11px] uppercase tracking-[0.15em] text-muted-foreground">
-          Warunek wejscia — opcjonalnie
+          Warunek wejścia — opcjonalnie
         </p>
         <input
           value={entryNote}
           onChange={(e) => setEntryNote(e.target.value)}
-          placeholder="np. czekam na cofniecie do 60"
+          placeholder="np. czekam na cofnięcie do 60"
           className={`${inputCls} w-full`}
         />
       </div>
@@ -247,7 +247,7 @@ export function AddObservationForm({
           disabled={busy}
           className="cyber-chamfer-sm flex-1 border border-accent bg-accent/10 py-1.5 font-mono text-sm uppercase tracking-wider text-accent transition-all hover:shadow-glow disabled:opacity-50"
         >
-          {busy ? "zapisuje..." : "zapisz typ"}
+          {busy ? "zapisuję..." : "zapisz typ"}
         </button>
         <button
           type="button"

@@ -18,26 +18,26 @@ export function PortfoliosSection() {
         <StatusPanel variant="error">
           <p className="mb-2 uppercase tracking-[0.2em]">// signal lost</p>
           <p className="text-foreground">
-            Nie udalo sie pobrac danych: <span className="text-destructive">{error}</span>
+            Nie udało się pobrać danych: <span className="text-destructive">{error}</span>
           </p>
           <p className="mt-3 text-xs text-muted-foreground">
-            Sprawdz, czy backend chodzi na :8000 i ma wlaczone CORS.
+            Sprawdź, czy backend chodzi na :8000 i ma włączone CORS.
           </p>
         </StatusPanel>
       ) : portfolios === null ? (
         <StatusPanel variant="loading">
-          <span className="cursor-blink">&gt; nawiazywanie polaczenia z API</span>
+          <span className="cursor-blink">&gt; nawiązywanie połączenia z API</span>
         </StatusPanel>
       ) : portfolios.length === 0 ? (
         <StatusPanel variant="empty">
           <p>
             <span className="text-accent">$</span> brak portfeli — kliknij{" "}
-            <span className="text-accent">„+ nowy portfel"</span> powyzej, zeby
-            zaczac.
+            <span className="text-accent">„+ nowy portfel"</span> powyżej, żeby
+            zacząć.
           </p>
           <p className="mt-2 text-xs">
-            Potem w karcie portfela dodasz pierwsza pozycje (ticker + liczba
-            sztuk + cena), a analiza policzy sie sama.
+            Potem w karcie portfela dodasz pierwszą pozycję (ticker + liczba
+            sztuk + cena), a analiza policzy się sama.
           </p>
         </StatusPanel>
       ) : (

@@ -45,7 +45,7 @@ export function PortfolioWorkspace() {
       <section>
         <SectionLabel>./portfolios --list</SectionLabel>
         <p className="-mt-2 mb-4 font-mono text-xs text-muted-foreground">
-          Twoje koszyki pozycji i ich wycena na zywo.
+          Twoje koszyki pozycji i ich wycena na żywo.
         </p>
         <PortfoliosSection />
       </section>
@@ -72,21 +72,21 @@ export function PortfolioWorkspace() {
 
           <Sekcja
             command="./portfolio --risk"
-            human="Ile realnie mozesz stracic: VaR / CVaR + stress test krachow."
+            human="Ile realnie możesz stracić: VaR / CVaR + stress test krachów."
           >
             <RiskReport />
           </Sekcja>
 
           <Sekcja
             command="./portfolio --behavior"
-            human="Log kupna/sprzedazy + ocena timingu (behavior gap)."
+            human="Log kupna/sprzedaży + ocena timingu (behavior gap)."
           >
             <BehaviorReport />
           </Sekcja>
 
           <Sekcja
             command="./portfolio --rebalance"
-            human="Jak daleko od rownych wag i ile kosztuje domkniecie rozjazdu."
+            human="Jak daleko od równych wag i ile kosztuje domknięcie rozjazdu."
           >
             <RebalanceReport />
           </Sekcja>

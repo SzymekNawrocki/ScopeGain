@@ -56,10 +56,10 @@ export function ThemesWorkspace() {
     <section>
       <SectionLabel>./themes --curate</SectionLabel>
       <p className="mb-5 max-w-2xl font-mono text-sm leading-relaxed text-muted-foreground">
-        Twoje pomysly inwestycyjne jako koszyki. Do kazdej spolki zapisujesz{" "}
-        <span className="text-accent">teze</span> i{" "}
-        <span className="text-accent">uniewaznienie</span> — a apka pozniej rozlicza Cie z
-        wlasnych typow (nie zeby zalowac, tylko zeby zobaczyc swoj hit rate).
+        Twoje pomysły inwestycyjne jako koszyki. Do każdej spółki zapisujesz{" "}
+        <span className="text-accent">tezę</span> i{" "}
+        <span className="text-accent">unieważnienie</span> — a apka później rozlicza Cię z
+        własnych typów (nie żeby żałować, tylko żeby zobaczyć swój hit rate).
       </p>
 
       {error && (
@@ -82,8 +82,8 @@ export function ThemesWorkspace() {
       {themes && themes.length === 0 ? (
         <StatusPanel variant="empty">
           <p>
-            <span className="text-accent">$</span> brak tematow. Utworz pierwszy albo dodaj
-            spolke z zakladki <span className="text-accent">Odkrywaj</span>.
+            <span className="text-accent">$</span> brak tematów. Utwórz pierwszy albo dodaj
+            spółkę z zakładki <span className="text-accent">Odkrywaj</span>.
           </p>
         </StatusPanel>
       ) : (
@@ -138,7 +138,7 @@ function NewThemeButton({
         className="cyber-chamfer-sm w-32 border border-border bg-[#0a0a0f] px-2 py-1.5 font-mono text-sm text-accent outline-none focus:border-accent"
       />
       <button type="submit" disabled={busy} className={chip(true)}>
-        utworz
+        utwórz
       </button>
       <button type="button" onClick={() => setOpen(false)} className={chip(false)}>
         x
@@ -183,9 +183,9 @@ function ThemeDetail({
         <button
           onClick={removeTheme}
           className="font-mono text-xs uppercase tracking-wider text-muted-foreground transition-colors hover:text-destructive"
-          title="usun temat"
+          title="usuń temat"
         >
-          [ usun temat ]
+          [ usuń temat ]
         </button>
       }
     >
@@ -209,8 +209,8 @@ function ThemeDetail({
         </ul>
       ) : (
         <p className="mb-3 font-mono text-sm text-muted-foreground">
-          <span className="text-accent">$</span> temat pusty — dodaj spolke ponizej albo z
-          zakladki Odkrywaj.
+          <span className="text-accent">$</span> temat pusty — dodaj spółkę poniżej albo z
+          zakładki Odkrywaj.
         </p>
       )}
 
@@ -229,7 +229,7 @@ function ThemeDetail({
           onClick={() => setAdding(true)}
           className="mt-3 w-full cyber-chamfer-sm border border-dashed border-border py-2 font-mono text-sm uppercase tracking-wider text-muted-foreground transition-all hover:border-accent hover:text-accent"
         >
-          + dodaj spolke recznie
+          + dodaj spółkę ręcznie
         </button>
       )}
     </TerminalWindow>
@@ -241,17 +241,17 @@ function ReckoningPanel({ reckoning }: { reckoning: Reckoning }) {
   return (
     <div className="mb-5 border-b border-border pb-5">
       <p className="mb-3 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
-        Rozliczenie — Twoj hit rate na calej puli
+        Rozliczenie — Twój hit rate na całej puli
       </p>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <StatTile label="Typow" value={String(s.total)} className="text-foreground" />
+        <StatTile label="Typów" value={String(s.total)} className="text-foreground" />
         <StatTile
           label="Na plusie / minusie"
           value={`${s.up} / ${s.down}`}
           hint={`policzalne: ${s.priced}`}
           className="text-accent-tertiary"
         />
-        <StatTile label="Uniewaznione" value={String(s.invalidated)} className="text-destructive" />
+        <StatTile label="Unieważnione" value={String(s.invalidated)} className="text-destructive" />
         <StatTile label="Kupione" value={`${s.acted} / ${s.total}`} className="text-accent" />
       </div>
       <p className="mt-3 font-mono text-xs italic leading-relaxed text-muted-foreground">
@@ -283,7 +283,7 @@ function ObservationRow({
         <button
           onClick={onDelete}
           className="ml-auto shrink-0 font-mono text-xs text-muted-foreground transition-colors hover:text-destructive"
-          title="usun typ"
+          title="usuń typ"
         >
           ✕
         </button>
@@ -294,14 +294,14 @@ function ObservationRow({
         <span className="text-foreground">Teza:</span> {obs.thesis}
       </p>
       <p className="font-mono text-xs leading-relaxed text-muted-foreground">
-        <span className="text-foreground">Uniewaznienie:</span>{" "}
+        <span className="text-foreground">Unieważnienie:</span>{" "}
         {obs.invalidation_price != null
-          ? `ponizej $${obs.invalidation_price}`
+          ? `poniżej $${obs.invalidation_price}`
           : obs.invalidation_note}
         {obs.entry_note && (
           <>
             {" · "}
-            <span className="text-foreground">Wejscie:</span> {obs.entry_note}
+            <span className="text-foreground">Wejście:</span> {obs.entry_note}
           </>
         )}
       </p>
@@ -319,13 +319,13 @@ function ObservationRow({
             <span className="text-muted-foreground">ruch: brak ceny</span>
           )}
           {row.invalidation_triggered === true && (
-            <span className="text-destructive">⚠ uniewaznienie przebite</span>
+            <span className="text-destructive">⚠ unieważnienie przebite</span>
           )}
           {row.invalidation_triggered === false && (
-            <span className="text-accent">teza trzyma (prog nienaruszony)</span>
+            <span className="text-accent">teza trzyma (próg nienaruszony)</span>
           )}
           {row.invalidation_triggered === null && (
-            <span className="text-muted-foreground">warunek opisowy — ocen sam</span>
+            <span className="text-muted-foreground">warunek opisowy — oceń sam</span>
           )}
           <button
             onClick={onActed}
@@ -335,7 +335,7 @@ function ObservationRow({
                 : "border-border text-muted-foreground hover:border-accent hover:text-accent"
             }`}
           >
-            {obs.acted ? "✓ kupione" : "kupilem?"}
+            {obs.acted ? "✓ kupione" : "kupiłem?"}
           </button>
         </div>
       )}

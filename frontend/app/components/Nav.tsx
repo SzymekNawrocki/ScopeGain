@@ -10,7 +10,7 @@ import { useWorkspace, WorkspaceTab } from "./WorkspaceProvider";
 const TABS: [WorkspaceTab, string][] = [
   ["odkrywaj", "Odkrywaj"],
   ["tematy", "Tematy"],
-  ["portfel", "Moj portfel"],
+  ["portfel", "Mój portfel"],
 ];
 
 export function Nav() {
