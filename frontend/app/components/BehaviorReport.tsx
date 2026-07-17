@@ -8,24 +8,13 @@ import {
   getPortfolioBehavior,
   getTransactions,
   Portfolio,
-  Severity,
   Transaction,
   TransactionSide,
 } from "../lib/api";
 import { TerminalWindow } from "./ui/TerminalWindow";
 import { StatusPanel } from "./ui/StatusPanel";
+import { VerdictFindings } from "./ui/VerdictFindings";
 import { fmt } from "../lib/format";
-
-const SEV_DOT: Record<Severity, string> = {
-  good: "bg-accent",
-  warn: "bg-[#ffcc00]",
-  bad: "bg-destructive",
-};
-const SEV_TEXT: Record<Severity, string> = {
-  good: "text-accent",
-  warn: "text-[#ffcc00]",
-  bad: "text-destructive",
-};
 
 const usd = (n: number) => `${n < 0 ? "-" : ""}$${fmt(Math.abs(n))}`;
 const today = () => new Date().toISOString().slice(0, 10);
@@ -150,20 +139,15 @@ export function BehaviorReport({ portfolios }: { portfolios: Portfolio[] }) {
 
 // Panel werdyktu zachowania: ocena + "zostawione na stole" + wnioski + caveat.
 function BehaviorPanel({ verdict }: { verdict: BehaviorVerdict }) {
-  const g = verdict.grade;
   const left = verdict.total_left_on_table;
   return (
-    <div className="cyber-chamfer-sm mb-5 border border-border bg-[#12121a] p-4">
-      <div className="mb-3 flex items-center justify-between border-b border-border pb-3">
-        <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
-          Werdykt zachowania — timing Twoich sprzedazy
-        </p>
-        <span className={`flex items-center gap-2 font-display text-sm font-bold ${SEV_TEXT[g]}`}>
-          <span className={`inline-block h-2.5 w-2.5 rounded-full ${SEV_DOT[g]}`} />
-          {verdict.grade_label}
-        </span>
-      </div>
-
+    <VerdictFindings
+      title="Werdykt zachowania — timing Twoich sprzedazy"
+      grade={verdict.grade}
+      gradeLabel={verdict.grade_label}
+      findings={verdict.findings}
+      caveat={verdict.caveat}
+    >
       {left !== 0 && (
         <p className="mb-3 font-mono text-sm">
           {left > 0 ? (
@@ -177,23 +161,7 @@ function BehaviorPanel({ verdict }: { verdict: BehaviorVerdict }) {
           )}
         </p>
       )}
-
-      <ul className="space-y-2.5">
-        {verdict.findings.map((f, i) => (
-          <li key={i} className="flex gap-3">
-            <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${SEV_DOT[f.severity]}`} />
-            <div>
-              <p className={`font-mono text-sm font-bold ${SEV_TEXT[f.severity]}`}>{f.title}</p>
-              <p className="font-mono text-xs text-muted-foreground">{f.detail}</p>
-            </div>
-          </li>
-        ))}
-      </ul>
-
-      <p className="mt-3 border-t border-border pt-3 font-mono text-xs italic text-muted-foreground">
-        * {verdict.caveat}
-      </p>
-    </div>
+    </VerdictFindings>
   );
 }
 

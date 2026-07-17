@@ -11,31 +11,15 @@ import {
   PortfolioCorrelations,
   PortfolioPerformance,
   PortfolioVerdict,
-  Severity,
 } from "../lib/api";
 import { PerformanceChart } from "./PerformanceChart";
 import { CorrelationMatrix } from "./CorrelationMatrix";
 import { TerminalWindow } from "./ui/TerminalWindow";
 import { StatTile } from "./ui/StatTile";
 import { StatusPanel } from "./ui/StatusPanel";
+import { VerdictFindings } from "./ui/VerdictFindings";
 import { pnlColor, withSign } from "../lib/format";
 
-// Wizualny jezyk oceny: kolor kropki/tekstu wg wagi wniosku.
-const SEV_DOT: Record<Severity, string> = {
-  good: "bg-accent",
-  warn: "bg-[#ffcc00]",
-  bad: "bg-destructive",
-};
-const SEV_TEXT: Record<Severity, string> = {
-  good: "text-accent",
-  warn: "text-[#ffcc00]",
-  bad: "text-destructive",
-};
-const SEV_LABEL: Record<Severity, string> = {
-  good: "MOCNY",
-  warn: "PRZECIETNY",
-  bad: "SLABY",
-};
 
 // Slowna ocena Sharpe'a wg reguly kciuka + kolor.
 function sharpeVerdict(s: number): { label: string; color: string } {
@@ -223,30 +207,15 @@ export function PortfolioVsMarket({ portfolios }: { portfolios: Portfolio[] }) {
 
 // Panel werdyktu: ocena laczna + lista wnioskow po ludzku z kolorem wagi.
 function VerdictPanel({ verdict }: { verdict: PortfolioVerdict }) {
-  const g = verdict.grade;
   return (
-    <div className="cyber-chamfer-sm mb-5 border border-border bg-[#12121a] p-4">
-      <div className="mb-3 flex items-center justify-between border-b border-border pb-3">
-        <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
-          Werdykt - czego broker Ci nie powie
-        </p>
-        <span className={`flex items-center gap-2 font-display text-sm font-bold ${SEV_TEXT[g]}`}>
-          <span className={`inline-block h-2.5 w-2.5 rounded-full ${SEV_DOT[g]}`} />
-          ocena: {SEV_LABEL[g]}
-        </span>
-      </div>
-      <ul className="space-y-2.5">
-        {verdict.findings.map((f, i) => (
-          <li key={i} className="flex gap-3">
-            <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${SEV_DOT[f.severity]}`} />
-            <div>
-              <p className={`font-mono text-sm font-bold ${SEV_TEXT[f.severity]}`}>{f.title}</p>
-              <p className="font-mono text-xs text-muted-foreground">{f.detail}</p>
-            </div>
-          </li>
-        ))}
-      </ul>
-    </div>
+    <VerdictFindings
+      title="Werdykt - czego broker Ci nie powie"
+      grade={verdict.grade}
+      // Bylo: wlasny slownik SEV_LABEL kluczowany po severity, ktory
+      // ignorowal grade_label z backendu. Teraz jedno zrodlo prawdy - API.
+      gradeLabel={`ocena: ${verdict.grade_label}`}
+      findings={verdict.findings}
+    />
   );
 }
 
