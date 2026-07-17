@@ -590,3 +590,174 @@ export async function getStockVerdict(
   if (!res.ok) throw new Error(await apiError(res));
   return res.json();
 }
+
+// --- Odkrywanie po kategoriach (Etap B) ---
+// Drill-down bez wpisywania tickera: sektor -> branza -> spolki, plus rozbicie
+// ETF. UWAGA (ADR-0002): lista spolek branzy to ranking "top" Yahoo, NIE pelny
+// spis - gubi liderow (Cameco przy uranie). Dlatego front dokleja zastrzezenie,
+// a luki latane sa szukaniem po nazwie i rozbiciem ETF.
+
+export type DiscoverNode = { key: string; name: string };
+export type DiscoverCompany = { ticker: string; name: string };
+
+export async function getDiscoverSectors(): Promise<DiscoverNode[]> {
+  const res = await apiFetch(`/discover/sectors`);
+  if (res.status === 401) throw new UnauthorizedError();
+  if (!res.ok) throw new Error(await apiError(res));
+  return res.json();
+}
+
+export async function getSectorIndustries(sectorKey: string): Promise<DiscoverNode[]> {
+  const res = await apiFetch(`/discover/sector/${encodeURIComponent(sectorKey)}`);
+  if (!res.ok) throw new Error(await apiError(res));
+  return res.json();
+}
+
+export async function getIndustryCompanies(industryKey: string): Promise<DiscoverCompany[]> {
+  const res = await apiFetch(`/discover/industry/${encodeURIComponent(industryKey)}`);
+  if (!res.ok) throw new Error(await apiError(res));
+  return res.json();
+}
+
+export async function getEtfHoldings(ticker: string): Promise<DiscoverCompany[]> {
+  const res = await apiFetch(`/discover/etf/${encodeURIComponent(ticker)}`);
+  if (!res.ok) throw new Error(await apiError(res));
+  return res.json();
+}
+
+// --- Tematy + Obserwacje (Etap B / plan decyzji) ---
+// Temat = koszyk KURATOROWANY (ADR-0002). Obserwacja = typ z Teza +
+// Uniewaznieniem; para (data, cena) z dodania pozwala go pozniej rozliczyc.
+
+export type Observation = {
+  id: number;
+  ticker: string;
+  name: string;
+  origin: string; // Pochodzenie ("branza:uranium" / "ETF:QTUM" / "nazwa")
+  thesis: string;
+  invalidation_note: string | null;
+  invalidation_price: number | null;
+  entry_note: string | null;
+  added_at: string; // "YYYY-MM-DD"
+  added_price: number | null; // null gdy rynek nie odpowiedzial przy dodaniu
+  acted: boolean;
+};
+
+export type Theme = {
+  id: number;
+  name: string;
+  created_at: string;
+  observations: Observation[];
+};
+
+// Wejscie do dodania obserwacji. Uniewaznienie obowiazkowe, ale moze byc cena
+// LUB opis - walidacje "co najmniej jedno" pilnuje backend (i formularz).
+export type ObservationInput = {
+  ticker: string;
+  name: string;
+  origin: string;
+  thesis: string;
+  invalidation_note?: string | null;
+  invalidation_price?: number | null;
+  entry_note?: string | null;
+};
+
+export async function getThemes(): Promise<Theme[]> {
+  const res = await apiFetch(`/themes`);
+  if (res.status === 401) throw new UnauthorizedError();
+  if (!res.ok) throw new Error(await apiError(res));
+  return res.json();
+}
+
+export async function getTheme(id: number): Promise<Theme> {
+  const res = await apiFetch(`/themes/${id}`);
+  if (!res.ok) throw new Error(await apiError(res));
+  return res.json();
+}
+
+export async function createTheme(name: string): Promise<Theme> {
+  const res = await apiFetch(`/themes`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) throw new Error(await apiError(res));
+  return res.json();
+}
+
+export async function deleteTheme(id: number): Promise<void> {
+  const res = await apiFetch(`/themes/${id}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(await apiError(res));
+}
+
+export async function addObservation(
+  themeId: number,
+  obs: ObservationInput,
+): Promise<Observation> {
+  const res = await apiFetch(`/themes/${themeId}/observations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(obs),
+  });
+  if (!res.ok) throw new Error(await apiError(res));
+  return res.json();
+}
+
+export async function deleteObservation(themeId: number, obsId: number): Promise<void> {
+  const res = await apiFetch(`/themes/${themeId}/observations/${obsId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error(await apiError(res));
+}
+
+// Przelacza flage "zadzialalem" (kupilem) - rozliczenie pyta o to wprost.
+export async function toggleObservationActed(
+  themeId: number,
+  obsId: number,
+): Promise<Observation> {
+  const res = await apiFetch(`/themes/${themeId}/observations/${obsId}/acted`, {
+    method: "POST",
+  });
+  if (!res.ok) throw new Error(await apiError(res));
+  return res.json();
+}
+
+// --- Rozliczenie typu (Etap 5) ---
+// Hit rate na CALEJ puli, neutralnie. Nigdy "trzeba bylo kupic" (ADR-0001).
+
+export type ReckoningRow = {
+  id: number;
+  ticker: string;
+  name: string;
+  added_at: string;
+  added_price: number | null;
+  current_price: number | null;
+  move_pct: number | null; // ruch od dodania
+  invalidation_price: number | null;
+  invalidation_note: string | null;
+  invalidation_triggered: boolean | null; // null = uniewaznienie opisowe (recznie)
+  acted: boolean;
+};
+
+export type ReckoningSummary = {
+  total: number;
+  priced: number;
+  up: number;
+  down: number;
+  invalidated: number;
+  acted: number;
+};
+
+export type Reckoning = {
+  id: number;
+  name: string;
+  caveat: string;
+  rows: ReckoningRow[];
+  summary: ReckoningSummary;
+};
+
+export async function getThemeReckoning(id: number): Promise<Reckoning> {
+  const res = await apiFetch(`/themes/${id}/reckoning`);
+  if (!res.ok) throw new Error(await apiError(res));
+  return res.json();
+}

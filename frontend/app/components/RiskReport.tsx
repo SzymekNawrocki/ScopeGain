@@ -3,13 +3,13 @@
 import { useEffect, useState } from "react";
 import {
   getPortfolioRisk,
-  Portfolio,
   PortfolioRiskReport,
   RISK_WINDOWS,
   RiskWindow,
   StressScenario,
   VarMeasure,
 } from "../lib/api";
+import { usePortfoliosContext } from "./PortfoliosProvider";
 import { TerminalWindow } from "./ui/TerminalWindow";
 import { StatTile } from "./ui/StatTile";
 import { StatusPanel } from "./ui/StatusPanel";
@@ -22,19 +22,14 @@ const usd = (n: number) => `${n < 0 ? "-" : ""}$${fmt(Math.abs(n))}`;
 const HORIZON_LABEL: Record<string, string> = { "1d": "Dzienny", "1m": "Miesieczny" };
 
 // Sekcja "ryzyko": ile realnie mozesz stracic. VaR/CVaR (metoda historyczna)
-// + stress test (odtworzenie krachow). Wybor portfela + okna estymacji.
-export function RiskReport({ portfolios }: { portfolios: Portfolio[] }) {
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+// + stress test (odtworzenie krachow) dla wspolnie wybranego portfela + okno
+// estymacji.
+export function RiskReport() {
+  const { selectedId } = usePortfoliosContext();
   const [window, setWindow] = useState<RiskWindow>("2y");
   const [risk, setRisk] = useState<PortfolioRiskReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (selectedId === null && portfolios.length > 0) {
-      setSelectedId(portfolios[0].id);
-    }
-  }, [portfolios, selectedId]);
 
   useEffect(() => {
     if (selectedId === null) return;
@@ -57,39 +52,14 @@ export function RiskReport({ portfolios }: { portfolios: Portfolio[] }) {
     };
   }, [selectedId, window]);
 
-  if (portfolios.length === 0) {
-    return (
-      <p className="font-mono text-sm text-muted-foreground">
-        <span className="text-accent">$</span> zaloz portfel i dodaj pozycje, zeby zobaczyc ryzyko.
-      </p>
-    );
-  }
-
   const daily = risk?.var.filter((v) => v.horizon === "1d") ?? [];
   const monthly = risk?.var.filter((v) => v.horizon === "1m") ?? [];
 
   return (
-    <div className="mb-12">
+    <div>
       <TerminalWindow title={`~/risk${risk ? `/${risk.name}` : ""}`}>
-        {/* Sterowanie: wybor portfela (jesli >1) + okno estymacji VaR */}
+        {/* Sterowanie: okno estymacji VaR (wybor portfela jest wspolny, na gorze) */}
         <div className="mb-5 flex flex-wrap items-center gap-4">
-          {portfolios.length > 1 && (
-            <div className="flex flex-wrap gap-1">
-              {portfolios.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => setSelectedId(p.id)}
-                  className={`cyber-chamfer-sm border px-3 py-1.5 font-mono text-sm uppercase tracking-wider transition-all ${
-                    p.id === selectedId
-                      ? "border-accent bg-accent/10 text-accent shadow-glow"
-                      : "border-border text-muted-foreground hover:border-accent hover:text-accent"
-                  }`}
-                >
-                  {p.name}
-                </button>
-              ))}
-            </div>
-          )}
           <div className="flex items-center gap-2">
             <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
               okno:

@@ -7,10 +7,10 @@ import {
   deleteTransaction,
   getPortfolioBehavior,
   getTransactions,
-  Portfolio,
   Transaction,
   TransactionSide,
 } from "../lib/api";
+import { usePortfoliosContext } from "./PortfoliosProvider";
 import { TerminalWindow } from "./ui/TerminalWindow";
 import { StatusPanel } from "./ui/StatusPanel";
 import { VerdictFindings } from "./ui/VerdictFindings";
@@ -19,19 +19,14 @@ import { fmt } from "../lib/format";
 const usd = (n: number) => `${n < 0 ? "-" : ""}$${fmt(Math.abs(n))}`;
 const today = () => new Date().toISOString().slice(0, 10);
 
-// Sekcja "zachowanie" (12b): log kupna/sprzedazy + werdykt timingu sprzedazy.
-// Atakuje behavior gap - czy sprzedales za wczesnie zwycieska spolke.
-export function BehaviorReport({ portfolios }: { portfolios: Portfolio[] }) {
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+// Sekcja "zachowanie" (12b): log kupna/sprzedazy + werdykt timingu sprzedazy
+// dla wspolnie wybranego portfela. Atakuje behavior gap - czy sprzedales za
+// wczesnie zwycieska spolke.
+export function BehaviorReport() {
+  const { selectedId } = usePortfoliosContext();
   const [txs, setTxs] = useState<Transaction[]>([]);
   const [behavior, setBehavior] = useState<BehaviorVerdict | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (selectedId === null && portfolios.length > 0) {
-      setSelectedId(portfolios[0].id);
-    }
-  }, [portfolios, selectedId]);
 
   const reload = useCallback((id: number) => {
     getTransactions(id)
@@ -48,36 +43,9 @@ export function BehaviorReport({ portfolios }: { portfolios: Portfolio[] }) {
     reload(selectedId);
   }, [selectedId, reload]);
 
-  if (portfolios.length === 0) {
-    return (
-      <p className="font-mono text-sm text-muted-foreground">
-        <span className="text-accent">$</span> zaloz portfel, zeby logowac transakcje i ocenic timing.
-      </p>
-    );
-  }
-
   return (
-    <div className="mb-12">
+    <div>
       <TerminalWindow title={`~/behavior${behavior ? `/${behavior.name}` : ""}`}>
-        {/* Wybor portfela (jesli >1) */}
-        {portfolios.length > 1 && (
-          <div className="mb-5 flex flex-wrap gap-1">
-            {portfolios.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => setSelectedId(p.id)}
-                className={`cyber-chamfer-sm border px-3 py-1.5 font-mono text-sm uppercase tracking-wider transition-all ${
-                  p.id === selectedId
-                    ? "border-accent bg-accent/10 text-accent shadow-glow"
-                    : "border-border text-muted-foreground hover:border-accent hover:text-accent"
-                }`}
-              >
-                {p.name}
-              </button>
-            ))}
-          </div>
-        )}
-
         <p className="mb-5 max-w-2xl font-mono text-xs leading-relaxed text-muted-foreground">
           <span className="text-accent">$</span> zapisz swoje kupna i sprzedaze. Apka porowna
           cene <span className="text-foreground">sprzedazy</span> z dzisiejsza i powie, czy

@@ -7,13 +7,13 @@ import {
   getPortfolioVerdict,
   PERIODS,
   Period,
-  Portfolio,
   PortfolioCorrelations,
   PortfolioPerformance,
   PortfolioVerdict,
 } from "../lib/api";
 import { PerformanceChart } from "./PerformanceChart";
 import { CorrelationMatrix } from "./CorrelationMatrix";
+import { usePortfoliosContext } from "./PortfoliosProvider";
 import { TerminalWindow } from "./ui/TerminalWindow";
 import { StatTile } from "./ui/StatTile";
 import { StatusPanel } from "./ui/StatusPanel";
@@ -37,22 +37,16 @@ function betaVerdict(b: number): string {
   return "mocniej niz rynek";
 }
 
-// Sekcja "portfel vs rynek": wybor portfela + zakresu, krzywa wzrostu i alpha.
-export function PortfolioVsMarket({ portfolios }: { portfolios: Portfolio[] }) {
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+// Sekcja "portfel vs rynek": krzywa wzrostu i alpha dla wspolnie wybranego
+// portfela (selectedId z PortfoliosProvider) + wybor zakresu.
+export function PortfolioVsMarket() {
+  const { selectedId } = usePortfoliosContext();
   const [period, setPeriod] = useState<Period>("1y");
   const [perf, setPerf] = useState<PortfolioPerformance | null>(null);
   const [corr, setCorr] = useState<PortfolioCorrelations | null>(null);
   const [verdict, setVerdict] = useState<PortfolioVerdict | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
-  // Domyslnie pierwszy portfel, gdy tylko lista dojdzie.
-  useEffect(() => {
-    if (selectedId === null && portfolios.length > 0) {
-      setSelectedId(portfolios[0].id);
-    }
-  }, [portfolios, selectedId]);
 
   useEffect(() => {
     if (selectedId === null) return;
@@ -83,36 +77,11 @@ export function PortfolioVsMarket({ portfolios }: { portfolios: Portfolio[] }) {
     };
   }, [selectedId, period]);
 
-  if (portfolios.length === 0) {
-    return (
-      <p className="font-mono text-sm text-muted-foreground">
-        <span className="text-accent">$</span> zaloz portfel i dodaj pozycje, zeby zobaczyc analize.
-      </p>
-    );
-  }
-
   return (
-    <div className="mb-12">
+    <div>
       <TerminalWindow title={`~/backtest${perf ? `/${perf.name}` : ""}`}>
-        {/* Sterowanie: wybor portfela (jesli >1) + zakres */}
+        {/* Sterowanie: zakres (wybor portfela jest wspolny, na gorze zakladki) */}
         <div className="mb-5 flex flex-wrap items-center gap-4">
-          {portfolios.length > 1 && (
-            <div className="flex flex-wrap gap-1">
-              {portfolios.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => setSelectedId(p.id)}
-                  className={`cyber-chamfer-sm border px-3 py-1.5 font-mono text-sm uppercase tracking-wider transition-all ${
-                    p.id === selectedId
-                      ? "border-accent bg-accent/10 text-accent shadow-glow"
-                      : "border-border text-muted-foreground hover:border-accent hover:text-accent"
-                  }`}
-                >
-                  {p.name}
-                </button>
-              ))}
-            </div>
-          )}
           <div className="flex gap-1">
             {PERIODS.map((p) => (
               <button

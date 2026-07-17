@@ -3,27 +3,21 @@
 import { useEffect, useState } from "react";
 import {
   getPortfolioRealPerformance,
-  Portfolio,
   RealPerformance,
 } from "../lib/api";
 import { PerformanceChart } from "./PerformanceChart";
+import { usePortfoliosContext } from "./PortfoliosProvider";
 import { TerminalWindow } from "./ui/TerminalWindow";
 import { StatusPanel } from "./ui/StatusPanel";
 import { pnlColor, withSign } from "../lib/format";
 
 // Sekcja "realna sciezka": TWR z logu transakcji zamiast hipotezy dzisiejszych
 // wag. Gdy log nie domyka sie z pozycjami - mowi o tym wprost (rekoncyliacja).
-export function RealPerformanceReport({ portfolios }: { portfolios: Portfolio[] }) {
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+export function RealPerformanceReport() {
+  const { selectedId } = usePortfoliosContext();
   const [data, setData] = useState<RealPerformance | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (selectedId === null && portfolios.length > 0) {
-      setSelectedId(portfolios[0].id);
-    }
-  }, [portfolios, selectedId]);
 
   useEffect(() => {
     if (selectedId === null) return;
@@ -44,37 +38,11 @@ export function RealPerformanceReport({ portfolios }: { portfolios: Portfolio[] 
     };
   }, [selectedId]);
 
-  if (portfolios.length === 0) {
-    return (
-      <p className="font-mono text-sm text-muted-foreground">
-        <span className="text-accent">$</span> zaloz portfel i zapisz transakcje, zeby zobaczyc realna sciezke.
-      </p>
-    );
-  }
-
   const rec = data?.reconciliation;
 
   return (
-    <div className="mb-12">
+    <div>
       <TerminalWindow title={`~/real-path${data ? `/${data.name}` : ""}`}>
-        {portfolios.length > 1 && (
-          <div className="mb-5 flex flex-wrap gap-1">
-            {portfolios.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => setSelectedId(p.id)}
-                className={`cyber-chamfer-sm border px-3 py-1.5 font-mono text-sm uppercase tracking-wider transition-all ${
-                  p.id === selectedId
-                    ? "border-accent bg-accent/10 text-accent shadow-glow"
-                    : "border-border text-muted-foreground hover:border-accent hover:text-accent"
-                }`}
-              >
-                {p.name}
-              </button>
-            ))}
-          </div>
-        )}
-
         <p className="mb-5 max-w-2xl font-mono text-xs leading-relaxed text-muted-foreground">
           <span className="text-accent">$</span> to co <span className="text-foreground">NAPRAWDE</span>{" "}
           trzymales dzien po dniu, z Twojego logu transakcji — metoda TWR (dokupienia

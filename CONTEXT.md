@@ -40,6 +40,10 @@ _Unikaj_: sektor, branża, watchlista.
 ich 145 i są zamkniętą listą. Bywa punktem wyjścia dla tematu, ale nim nie jest:
 „uran” jest branżą, „kwanty” nie są i nie będą.
 _Unikaj_: temat, sektor (sektor to szerszy poziom: „Energia”).
+Uwaga o kompletności: lista spółek branży, którą oddaje źródło (`yf.Industry`), to
+**ranking „top”, a nie spis** — gubi liderów (przy uranie pomija Cameco, dokładnie
+jak wyszukiwarka po nazwie). Dlatego przeglądanie po branży niesie jawne
+zastrzeżenie, a luki uzupełnia się rozbiciem ETF i szukaniem po nazwie.
 
 **Kandydat** — spółka zaproponowana użytkownikowi do tematu. Kandydatem się bywa,
 składnikiem tematu zostaje się dopiero decyzją użytkownika.
@@ -47,11 +51,19 @@ składnikiem tematu zostaje się dopiero decyzją użytkownika.
 **Pochodzenie** — skąd kandydat się wziął („z branży Uranium”, „z ETF QTUM”, „dodane
 ręcznie”). Widoczne zawsze, bo bez tego użytkownik nie wie, czemu ma ufać liście.
 
-**Obserwacja** — spółka w temacie wraz z **datą i ceną z momentu dodania**. To ta
-para liczb pozwala później rozliczyć użytkownika z jego własnego typu.
+**Obserwacja** — spółka w temacie wraz z całym **planem decyzji**: Tezą,
+Unieważnieniem, opcjonalnym warunkiem wejścia oraz **datą i ceną z momentu dodania**.
+Ta para liczb (data + cena) pozwala później rozliczyć użytkownika z jego własnego typu.
+_Unikaj_: pozycja (obserwacja to „rozważam”, nie „mam”).
 
 **Teza** — napisany przez użytkownika powód, dla którego dodał spółkę („deficyt podaży
 uranu”). Apka konfrontuje ją później z tym, co się faktycznie stało.
+
+**Unieważnienie** — zapisany z góry warunek, przy którym użytkownik uzna, że się mylił:
+**cena progu** („poniżej 55”) **albo** opisany warunek („jeśli deficyt uranu się nie
+zmaterializuje do 2027”). Bez niego decyzji nie da się później uczciwie rozliczyć —
+typ bez warunku porażki wygląda zawsze na trafny. To dyscyplina, nie sygnał (ADR-0001).
+_Unikaj_: stop-loss (to nie zlecenie ani mechanika day-tradingu — patrz ADR-0003).
 
 ---
 
@@ -76,6 +88,20 @@ przez przemilczenie, więc mówimy wprost.
 **Punkt odniesienia** — neutralna miara, względem której widać rozjazd (np. równe wagi
 przy rebalansingu). **Nie** jest poradą, co kupić.
 _Unikaj_: cel, rekomendacja.
+
+**Rozliczenie typu** — konfrontacja Obserwacji z tym, co się faktycznie stało: ruch od
+ceny dodania, czy zadziałało Unieważnienie, czy użytkownik zadziałał (kupił). Liczone na
+**całej puli** typów, nie tylko na trafionych — inaczej uczyłoby FOMO (pokazywanie samych
+wygranych to ta sama nieuczciwość, którą krytykuje się u sprzedawców strategii). Nigdy
+nie mówi „trzeba było kupić” — to złamałoby ADR-0001 tylnymi drzwiami. Odbija decyzję
+użytkownika, nie wydaje nowej.
+_Unikaj_: wynik, żal, „a nie mówiłem”.
+
+**Trafność typu** — kierunek ruchu ceny od momentu dodania względem tezy (na plus / na
+minus). Opisuje fakt, nie ocenia jakości spółki i nie jest sygnałem.
+
+**Hit rate** — udział trafionych typów w całej puli. Miara **dyscypliny selekcji**
+(„ile z moich pomysłów faktycznie zadziałało”), a nie zachęta do handlu.
 
 ---
 

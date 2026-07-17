@@ -3,13 +3,17 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { getPortfolios, Portfolio } from "../lib/api";
 
-// Jedyne miejsce w apce, ktore trzyma stan listy portfeli. "portfele" (karty +
-// formularz) i "analiza" (portfel vs rynek) czytaja te sama liste, ale nie
-// siedza obok siebie w layoucie (miedzy nimi jest sekcja "rynek") - Context
-// pozwala im dzielic stan bez zmiany kolejnosci sekcji na stronie i bez
-// zamieniania calego page.tsx w Client Component.
+// Jedyne miejsce w apce, ktore trzyma stan listy portfeli ORAZ ktory z nich
+// jest aktualnie wybrany do analizy. Wczesniej kazda sekcja analityczna
+// (analiza / ryzyko / realna / zachowanie / rebalans) trzymala WLASNY selectedId
+// i rysowala WLASNY rzad przyciskow wyboru - przy kilku portfelach user widzial
+// ten sam wybor powtorzony 5 razy, a wybor w jednej sekcji nie synchronizowal
+// sie z reszta. Teraz wybor jest jeden i wspolny: jeden PortfolioSelector na
+// gorze zakladki "Moj portfel" steruje wszystkimi sekcjami naraz.
 type Ctx = {
   portfolios: Portfolio[] | null;
+  selectedId: number | null;
+  setSelectedId: (id: number) => void;
   error: string | null;
   reload: () => void;
 };
@@ -24,13 +28,22 @@ export function usePortfoliosContext(): Ctx {
 
 export function PortfoliosProvider({ children }: { children: React.ReactNode }) {
   const [portfolios, setPortfolios] = useState<Portfolio[] | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // reload = jedno zrodlo prawdy: pobiera liste portfeli. Kazda mutacja
   // (utworz/dodaj/usun) wola to po sobie, wiec caly UI zawsze widzi swiezy stan.
   const reload = useCallback(() => {
     getPortfolios()
-      .then(setPortfolios)
+      .then((list) => {
+        setPortfolios(list);
+        // Utrzymaj wybor wazny: gdy nic jeszcze nie wybrano albo wybrany portfel
+        // zniknal (usuniety), przeskocz na pierwszy z listy. Gdy wybrany dalej
+        // istnieje - nie ruszaj go (nie chcemy resetowac po dodaniu pozycji).
+        setSelectedId((cur) =>
+          cur !== null && list.some((p) => p.id === cur) ? cur : list[0]?.id ?? null,
+        );
+      })
       .catch((e) => setError(e.message ?? "Brak polaczenia z API"));
   }, []);
 
@@ -41,7 +54,7 @@ export function PortfoliosProvider({ children }: { children: React.ReactNode }) 
   }, [reload]);
 
   return (
-    <PortfoliosContext.Provider value={{ portfolios, error, reload }}>
+    <PortfoliosContext.Provider value={{ portfolios, selectedId, setSelectedId, error, reload }}>
       {children}
     </PortfoliosContext.Provider>
   );

@@ -1,6 +1,6 @@
 from datetime import date
 
-from sqlalchemy import Date, ForeignKey, Numeric, String
+from sqlalchemy import Boolean, Date, ForeignKey, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
@@ -85,3 +85,56 @@ class Transaction(Base):
 
     portfolio_id: Mapped[int] = mapped_column(ForeignKey("portfolios.id"), index=True)
     portfolio: Mapped["Portfolio"] = relationship(back_populates="transactions")
+
+
+class Theme(Base):
+    """Temat (Etap B) - koszyk KURATOROWANY przez usera ("Uran", "Kwanty").
+
+    NIE jest wynikiem wyszukiwarki ani branza (ADR-0002): apka podsuwa
+    kandydatow z pochodzeniem, ale to user decyduje, kto wchodzi. Osobno od
+    portfela - temat to "co rozwazam", portfel to "co mam".
+    """
+
+    __tablename__ = "themes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(100))
+    created_at: Mapped[date] = mapped_column(Date, default=date.today)
+
+    # jak portfele: nullable dla ewentualnych osieroconych, w kodzie zawsze
+    # ustawiane i filtrowane po zalogowanym userze.
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True)
+
+    observations: Mapped[list["Observation"]] = relationship(
+        back_populates="theme", cascade="all, delete-orphan"
+    )
+
+
+class Observation(Base):
+    """Obserwacja - spolka w temacie wraz z PLANEM decyzji (Etap 3).
+
+    To nie sama spolka: to Twoj zapisany typ. Para (data, cena) z momentu
+    dodania pozwala pozniej UCZCIWIE rozliczyc decyzje (Etap 5). Doszlo
+    Uniewaznienie ("przy czym uznam, ze sie myle") - bez niego decyzji nie
+    da sie rozliczyc z warunkiem porazki (lekcja z dyscypliny selekcji).
+    """
+
+    __tablename__ = "observations"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ticker: Mapped[str] = mapped_column(String(15))          # CCO.TO, U-UN.TO tez
+    name: Mapped[str] = mapped_column(String(255))           # nazwa czytelna spolki
+    origin: Mapped[str] = mapped_column(String(100))         # Pochodzenie ("branza:uranium")
+
+    thesis: Mapped[str] = mapped_column(Text)                # Teza (dlaczego dodalem)
+    # Uniewaznienie: cena LUB napisany warunek (co najmniej jedno - pilnuje router).
+    invalidation_note: Mapped[str | None] = mapped_column(Text)
+    invalidation_price: Mapped[float | None] = mapped_column(Numeric(18, 4))
+    entry_note: Mapped[str | None] = mapped_column(Text)     # opcjonalny warunek/cena wejscia
+
+    added_at: Mapped[date] = mapped_column(Date, default=date.today)
+    added_price: Mapped[float | None] = mapped_column(Numeric(18, 4))  # None gdy rynek nie odpowie
+    acted: Mapped[bool] = mapped_column(Boolean, default=False)        # czy kupilem
+
+    theme_id: Mapped[int] = mapped_column(ForeignKey("themes.id"), index=True)
+    theme: Mapped["Theme"] = relationship(back_populates="observations")

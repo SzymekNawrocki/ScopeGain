@@ -8,6 +8,7 @@ dostawce danych, ruszamy tylko ten plik. To tez ulatwia testy (mozna podmienic).
 import requests
 import pandas as pd
 import yfinance as yf
+from yfinance import const as yf_const
 from yfinance.exceptions import YFRateLimitError
 
 from cache import ttl_cache
@@ -19,6 +20,7 @@ BENCHMARK = "SPY"
 # spolki nie zmieni sie do jutra), podpowiedzi tez - stad godziny, nie sekundy.
 SEARCH_TTL = 60 * 60          # 1 h
 PROFILE_TTL = 12 * 60 * 60    # 12 h
+DISCOVER_TTL = 12 * 60 * 60   # 12 h - katalog sektorow/branz zmienia sie wolno
 
 
 class MarketUnavailable(Exception):
@@ -302,3 +304,125 @@ def company_profile(ticker: str) -> dict | None:
         return None
 
     return _normalize_info(ticker, info)
+
+
+# --- Odkrywanie: przegladanie po branzy i rozbicie ETF (Etap B) -------------
+# Wejscie dla kogos, kto NIE zna symbolu i chce "skategoryzowac". Uczciwosc jest
+# tu twardym ograniczeniem (ADR-0002), bo zrodlo klamie przez przemilczenie:
+#
+#   yf.Industry("uranium").top_companies -> UEC, LEU, NUCL. CAMECO (CCJ) WYPADA,
+#   mimo ze jego wlasny profil mowi industry="Uranium". `top_companies` to
+#   ranking "top" od Yahoo, NIE spis branzy - i gubi lidera, tak samo jak
+#   Search("uranium"). Dlatego:
+#     1) NIE oddajemy kolumny `rating` ("Strong Buy"/"Buy") - to jezyk porady,
+#        zakazany przez ADR-0001. Zostaje sam {ticker, name}.
+#     2) Front dokleja jawne zastrzezenie ("to ranking, nie pelny spis"), a luki
+#        latane sa rozbiciem ETF i szukaniem po nazwie.
+#   ETF (funds_data.top_holdings) daje realny koszyk dla tematow bez branzy
+#   (QTUM -> spolki "kwantowe"), tez z symbolami do dalszej kuracji.
+
+# 11 sektorow Yahoo (zamknieta, stabilna lista). Klucz = slug do yf.Sector();
+# dla tych 11 nazw wystarczy lowercase + myslnik zamiast spacji (brak "&").
+_SECTOR_NAMES = list(yf_const.SECTOR_INDUSTY_MAPPING.keys())
+
+
+def _sector_key(name: str) -> str:
+    return name.lower().replace(" ", "-")
+
+
+def browsable_sectors() -> list[dict]:
+    """11 sektorow do przegladania (drill-down: sektor -> branza -> spolki).
+
+    Bez sieci - lista jest w taksonomii yfinance. Zwraca [{key, name}].
+    """
+    return [{"key": _sector_key(n), "name": n} for n in _SECTOR_NAMES]
+
+
+def _normalize_industries(df: pd.DataFrame) -> list[dict]:
+    """DataFrame branz sektora -> [{key, name}]. CZYSTA funkcja.
+
+    yf.Sector(...).industries: index = KLUCZ branzy ('uranium'), kolumna 'name'
+    = nazwa czytelna. Klucz bierzemy z indeksu (to on idzie do yf.Industry).
+    """
+    if df is None or df.empty:
+        return []
+    out: list[dict] = []
+    for key, row in df.iterrows():
+        out.append({"key": str(key), "name": str(row.get("name") or key)})
+    return out
+
+
+def _normalize_top_companies(df: pd.DataFrame) -> list[dict]:
+    """DataFrame top_companies branzy -> [{ticker, name}]. CZYSTA funkcja.
+
+    Index = symbol. Kolumne `rating` (Strong Buy/Buy/Hold) SWIADOMIE POMIJAMY -
+    to jezyk porady zakazany przez ADR-0001; niech nie wycieka z modulu.
+    """
+    if df is None or df.empty:
+        return []
+    out: list[dict] = []
+    for symbol, row in df.iterrows():
+        out.append({"ticker": str(symbol).upper(), "name": str(row.get("name") or symbol)})
+    return out
+
+
+def _normalize_holdings(df: pd.DataFrame) -> list[dict]:
+    """DataFrame top_holdings ETF-u -> [{ticker, name}]. CZYSTA funkcja.
+
+    funds_data.top_holdings: index = Symbol, kolumna 'Name'. Wagi pomijamy -
+    do kuracji tematu wystarczy, kto jest w koszyku.
+    """
+    if df is None or df.empty:
+        return []
+    out: list[dict] = []
+    for symbol, row in df.iterrows():
+        out.append({"ticker": str(symbol).upper(), "name": str(row.get("Name") or symbol)})
+    return out
+
+
+@ttl_cache(DISCOVER_TTL)
+def sector_industries(sector_key: str) -> list[dict]:
+    """Branze w danym sektorze (drugi poziom drill-downu). [{key, name}].
+
+    Pusta lista = zly klucz sektora / brak danych. MarketUnavailable = limit.
+    """
+    try:
+        df = yf.Sector(sector_key).industries
+    except YFRateLimitError as e:
+        raise MarketUnavailable("Limit zapytan do zrodla danych.") from e
+    except Exception:
+        return []
+    return _normalize_industries(df)
+
+
+@ttl_cache(DISCOVER_TTL)
+def industry_companies(industry_key: str) -> list[dict]:
+    """Spolki z branzy przez yf.Industry(...).top_companies. [{ticker, name}].
+
+    UWAGA: to ranking "top" Yahoo, NIE pelny spis - gubi liderow (CCJ przy
+    uranie). Zastrzezenie dokleja front; tu tylko oddajemy, co zrodlo daje,
+    bez kolumny `rating`. Pusta lista = zly klucz / brak danych.
+    """
+    try:
+        df = yf.Industry(industry_key).top_companies
+    except YFRateLimitError as e:
+        raise MarketUnavailable("Limit zapytan do zrodla danych.") from e
+    except Exception:
+        return []
+    return _normalize_top_companies(df)
+
+
+@ttl_cache(DISCOVER_TTL)
+def etf_holdings(etf_ticker: str) -> list[dict]:
+    """Sklad ETF-u (funds_data.top_holdings) jako kandydaci. [{ticker, name}].
+
+    Dla tematow bez branzy (kwanty -> QTUM). Pusta lista = to nie ETF / brak
+    danych o skladzie. MarketUnavailable = limit zapytan.
+    """
+    try:
+        df = yf.Ticker(etf_ticker).funds_data.top_holdings
+    except YFRateLimitError as e:
+        raise MarketUnavailable("Limit zapytan do zrodla danych.") from e
+    except Exception:
+        return []
+    return _normalize_holdings(df)

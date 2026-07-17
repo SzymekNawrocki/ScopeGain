@@ -328,3 +328,88 @@ def build_behavior_verdict(sells: list[dict]) -> dict:
         "caveat": BEHAVIOR_CAVEAT,
         "findings": f,
     }
+
+
+# --- Rozliczenie typu (Etap 5) ---------------------------------------------
+# Domyka petle "rozwazam -> rozliczam sie". Uczy DYSCYPLINY, nie zalu.
+#
+# Twarde granice (grill 07/2026):
+#   - Liczymy na CALEJ puli typow (hit rate), nie tylko na wygranych - pokazanie
+#     samych wygranych uczyloby FOMO (to sama krytyka, ktora user wytknal
+#     filmikowi o day-tradingu).
+#   - NIGDY "apka miala racje" / "trzeba bylo kupic" - to zlamaloby ADR-0001
+#     tylnymi drzwiami (porada po fakcie). Odbijamy TWOJA decyzje, nie wydajemy
+#     nowej. Stad neutralne liczby: ruch od dodania, stan uniewaznienia, acted.
+#
+# Uniewaznienie cenowe traktujemy jako DOLNY prog ("jak spadnie ponizej X,
+# myle sie") - typowe dla dlugoterminowej tezy. `invalidation_triggered`:
+#   True  = jest cena progu i biezaca <= prog,
+#   False = jest cena progu i biezaca > prog,
+#   None  = brak progu cenowego (uniewaznienie opisowe -> oceniasz recznie).
+
+RECKONING_CAVEAT = (
+    "To rozliczenie Twojej DYSCYPLINY, nie porada. Ruch liczymy od ceny z dnia "
+    "dodania; apka nie mowi 'trzeba bylo kupic' - pokazuje calą pulę Twoich "
+    "typow (nie tylko trafione), zebys widzial wlasny hit rate, a nie pojedyncze "
+    "wygrane. Nie wiemy, co zrobiles z gotowka."
+)
+
+
+def build_reckoning(observations: list[dict], prices: dict[str, float]) -> dict:
+    """Rozlicza typy w temacie. CZYSTA funkcja: obserwacje + ceny -> wiersze +
+    podsumowanie (hit rate). Zero HTTP/yfinance.
+
+    Kazda obserwacja to dict: {id, ticker, name, added_at, added_price,
+    invalidation_price, invalidation_note, acted}. `prices` = {TICKER: cena_dzis}.
+    """
+    rows: list[dict] = []
+    priced = up = down = invalidated = acted = 0
+
+    for o in observations:
+        ticker = str(o["ticker"]).upper()
+        current = prices.get(ticker)
+        added = o.get("added_price")
+        inval_price = o.get("invalidation_price")
+
+        move_pct = None
+        if current is not None and added not in (None, 0):
+            # `or 0.0` normalizuje -0.0 (brzydkie "-0.0%" tuz po dodaniu) do 0.0.
+            move_pct = round((current / float(added) - 1) * 100, 2) or 0.0
+            priced += 1
+            if move_pct > 0:
+                up += 1
+            elif move_pct < 0:
+                down += 1
+
+        triggered = None
+        if inval_price is not None and current is not None:
+            triggered = current <= float(inval_price)
+            if triggered:
+                invalidated += 1
+
+        if o.get("acted"):
+            acted += 1
+
+        rows.append({
+            "id": o["id"],
+            "ticker": ticker,
+            "name": o.get("name") or ticker,
+            "added_at": o.get("added_at"),
+            "added_price": float(added) if added is not None else None,
+            "current_price": current,
+            "move_pct": move_pct,
+            "invalidation_price": float(inval_price) if inval_price is not None else None,
+            "invalidation_note": o.get("invalidation_note"),
+            "invalidation_triggered": triggered,
+            "acted": bool(o.get("acted")),
+        })
+
+    summary = {
+        "total": len(observations),
+        "priced": priced,
+        "up": up,
+        "down": down,
+        "invalidated": invalidated,
+        "acted": acted,
+    }
+    return {"rows": rows, "summary": summary, "caveat": RECKONING_CAVEAT}

@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 # ------------------------------------------------------------------------
 # Schematy Pydantic = "kontrakt" API. Opisuja ksztalt danych NA GRANICY
@@ -234,3 +234,107 @@ class StockVerdict(BaseModel):
     caveat: str              # jawne zastrzezenie - zawsze przy werdykcie
     data_gaps: list[str]     # czego zabraklo; werdykt z 2 regul != werdykt z 5
     findings: list[VerdictFinding]
+
+
+# --- ODKRYWANIE (Etap B) ---
+# Drill-down bez wpisywania tickera: sektor -> branza -> spolki, plus rozbicie
+# ETF. Kazdy kandydat niesie POCHODZENIE (front je pokazuje). UWAGA: lista
+# spolek branzy to ranking "top" Yahoo, NIE pelny spis - gubi liderow (CCJ przy
+# uranie); zastrzezenie dokleja front (ADR-0002).
+
+class DiscoverNode(BaseModel):
+    """Sektor lub branza w drzewie przegladania."""
+    key: str
+    name: str
+
+
+class DiscoverCompany(BaseModel):
+    ticker: str
+    name: str
+
+
+# --- TEMAT + OBSERWACJA (Etap B / plan decyzji) ---
+
+class ObservationCreate(BaseModel):
+    """Dodanie typu do tematu. Teza obowiazkowa; Uniewaznienie obowiazkowe, ale
+    moze byc cena LUB opis (co najmniej jedno). Wejscie opcjonalne. Data i cena
+    z momentu dodania NIE przychodza od klienta - lapie je serwer."""
+    ticker: str = Field(min_length=1, max_length=15)
+    name: str = Field(min_length=1, max_length=255)
+    origin: str = Field(min_length=1, max_length=100)   # Pochodzenie
+    thesis: str = Field(min_length=1, max_length=2000)
+    invalidation_note: str | None = Field(default=None, max_length=2000)
+    invalidation_price: float | None = Field(default=None, gt=0)
+    entry_note: str | None = Field(default=None, max_length=2000)
+
+    @model_validator(mode="after")
+    def _wymagaj_uniewaznienia(self):
+        # Bez warunku porazki decyzji nie da sie pozniej UCZCIWIE rozliczyc.
+        if not self.invalidation_note and self.invalidation_price is None:
+            raise ValueError(
+                "Podaj Uniewaznienie: cene progu LUB opisany warunek (co najmniej jedno)."
+            )
+        return self
+
+
+class ObservationRead(BaseModel):
+    id: int
+    ticker: str
+    name: str
+    origin: str
+    thesis: str
+    invalidation_note: str | None
+    invalidation_price: float | None
+    entry_note: str | None
+    added_at: date
+    added_price: float | None
+    acted: bool
+
+    model_config = {"from_attributes": True}
+
+
+class ThemeCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+
+
+class ThemeRead(BaseModel):
+    id: int
+    name: str
+    created_at: date
+    observations: list[ObservationRead] = []
+
+    model_config = {"from_attributes": True}
+
+
+# --- ROZLICZENIE TYPU (Etap 5) ---
+# Hit rate na CALEJ puli, neutralnie. Nigdy "trzeba bylo kupic" (ADR-0001).
+
+class ReckoningRow(BaseModel):
+    id: int
+    ticker: str
+    name: str
+    added_at: date
+    added_price: float | None
+    current_price: float | None
+    move_pct: float | None                 # ruch od dodania w %
+    invalidation_price: float | None
+    invalidation_note: str | None
+    invalidation_triggered: bool | None    # None = uniewaznienie opisowe (recznie)
+    acted: bool
+
+
+class ReckoningSummary(BaseModel):
+    total: int
+    priced: int          # ile da sie policzyc (jest cena teraz i z dodania)
+    up: int              # ile na plus od dodania
+    down: int
+    invalidated: int     # ile z przebitym progiem uniewaznienia
+    acted: int           # ile kupionych
+
+
+class ReckoningOut(BaseModel):
+    id: int
+    name: str
+    caveat: str
+    rows: list[ReckoningRow]
+    summary: ReckoningSummary

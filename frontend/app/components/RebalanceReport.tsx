@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 import {
   getPortfolioRebalance,
-  Portfolio,
   RebalanceLeg,
   RebalancePlan,
 } from "../lib/api";
+import { usePortfoliosContext } from "./PortfoliosProvider";
 import { TerminalWindow } from "./ui/TerminalWindow";
 import { StatTile } from "./ui/StatTile";
 import { StatusPanel } from "./ui/StatusPanel";
@@ -16,17 +16,11 @@ const usd = (n: number) => `${n < 0 ? "-" : ""}$${fmt(Math.abs(n))}`;
 
 // Sekcja "rebalans" (12c): jak daleko portfel od rownych wag + ile kosztuje
 // domkniecie rozjazdu. NIE porada (ADR-0001) - punkt odniesienia + trade-off.
-export function RebalanceReport({ portfolios }: { portfolios: Portfolio[] }) {
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+export function RebalanceReport() {
+  const { selectedId } = usePortfoliosContext();
   const [plan, setPlan] = useState<RebalancePlan | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (selectedId === null && portfolios.length > 0) {
-      setSelectedId(portfolios[0].id);
-    }
-  }, [portfolios, selectedId]);
 
   useEffect(() => {
     if (selectedId === null) return;
@@ -47,35 +41,9 @@ export function RebalanceReport({ portfolios }: { portfolios: Portfolio[] }) {
     };
   }, [selectedId]);
 
-  if (portfolios.length === 0) {
-    return (
-      <p className="font-mono text-sm text-muted-foreground">
-        <span className="text-accent">$</span> zaloz portfel z kilkoma spolkami, zeby zobaczyc rebalans.
-      </p>
-    );
-  }
-
   return (
-    <div className="mb-12">
+    <div>
       <TerminalWindow title={`~/rebalance${plan ? `/${plan.name}` : ""}`}>
-        {portfolios.length > 1 && (
-          <div className="mb-5 flex flex-wrap gap-1">
-            {portfolios.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => setSelectedId(p.id)}
-                className={`cyber-chamfer-sm border px-3 py-1.5 font-mono text-sm uppercase tracking-wider transition-all ${
-                  p.id === selectedId
-                    ? "border-accent bg-accent/10 text-accent shadow-glow"
-                    : "border-border text-muted-foreground hover:border-accent hover:text-accent"
-                }`}
-              >
-                {p.name}
-              </button>
-            ))}
-          </div>
-        )}
-
         <p className="mb-5 max-w-2xl font-mono text-xs leading-relaxed text-muted-foreground">
           <span className="text-accent">$</span> punkt odniesienia:{" "}
           <span className="text-foreground">rowne wagi (1/N)</span> jako neutralna miara
