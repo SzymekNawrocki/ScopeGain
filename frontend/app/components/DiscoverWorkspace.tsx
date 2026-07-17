@@ -34,7 +34,7 @@ export function DiscoverWorkspace() {
 
   return (
     <section>
-      <SectionLabel>./discover --scope</SectionLabel>
+      <SectionLabel>Znajdź spółkę</SectionLabel>
       <p className="mb-5 max-w-2xl font-mono text-sm leading-relaxed text-muted-foreground">
         Znajdź spółki bez znajomości symbolu:{" "}
         <span className="text-foreground">przeglądaj po kategorii</span> (branża lub skład
@@ -137,7 +137,7 @@ function BrowsePanel() {
   }
 
   return (
-    <TerminalWindow title="~/discover/browse">
+    <TerminalWindow title="Przeglądaj po kategorii">
       {/* Sektory */}
       <p className="mb-2 font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
         Sektor

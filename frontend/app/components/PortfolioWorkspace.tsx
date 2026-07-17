@@ -43,7 +43,7 @@ export function PortfolioWorkspace() {
       {/* Portfele: nowy portfel + karty pozycji. Sam obsluguje stany
           ladowania / bledu / pustki. */}
       <section>
-        <SectionLabel>./portfolios --list</SectionLabel>
+        <SectionLabel>Twoje portfele</SectionLabel>
         <p className="-mt-2 mb-4 font-mono text-xs text-muted-foreground">
           Twoje koszyki pozycji i ich wycena na żywo.
         </p>
@@ -57,35 +57,35 @@ export function PortfolioWorkspace() {
           <PortfolioSelector />
 
           <Sekcja
-            command="./portfolio --analyze"
+            command="Analiza vs rynek"
             human="Backtest vs rynek (hipotetyczny), werdykt i korelacje."
           >
             <PortfolioVsMarket />
           </Sekcja>
 
           <Sekcja
-            command="./portfolio --real-path"
+            command="Realna ścieżka"
             human="Realna krzywa z logu transakcji (TWR), nie z dzisiejszych wag."
           >
             <RealPerformanceReport />
           </Sekcja>
 
           <Sekcja
-            command="./portfolio --risk"
+            command="Ryzyko"
             human="Ile realnie możesz stracić: VaR / CVaR + stress test krachów."
           >
             <RiskReport />
           </Sekcja>
 
           <Sekcja
-            command="./portfolio --behavior"
+            command="Zachowanie"
             human="Log kupna/sprzedaży + ocena timingu (behavior gap)."
           >
             <BehaviorReport />
           </Sekcja>
 
           <Sekcja
-            command="./portfolio --rebalance"
+            command="Rebalans"
             human="Jak daleko od równych wag i ile kosztuje domknięcie rozjazdu."
           >
             <RebalanceReport />

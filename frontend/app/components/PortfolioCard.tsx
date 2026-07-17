@@ -66,7 +66,7 @@ export function PortfolioCard({
 
       <TerminalWindow
         className="transition-all duration-300 group-hover:border-accent group-hover:shadow-glow"
-        title={`~/portfolios/${portfolio.id}`}
+        title={portfolio.name}
         actions={
           val && (
             <span className={`font-mono text-xs font-bold ${pnlColor(val.total_pnl_pct)}`}>

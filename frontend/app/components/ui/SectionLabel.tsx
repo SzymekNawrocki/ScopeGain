@@ -4,7 +4,7 @@
 export function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <p className="mb-4 font-mono text-sm uppercase tracking-[0.3em] text-accent-tertiary">
-      <span className="text-accent">$</span> {children}
+      {children}
     </p>
   );
 }

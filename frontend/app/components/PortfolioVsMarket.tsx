@@ -79,7 +79,7 @@ export function PortfolioVsMarket() {
 
   return (
     <div>
-      <TerminalWindow title={`~/backtest${perf ? `/${perf.name}` : ""}`}>
+      <TerminalWindow title={`Analiza vs rynek${perf ? ` — ${perf.name}` : ""}`}>
         {/* Sterowanie: zakres (wybor portfela jest wspolny, na gorze zakladki) */}
         <div className="mb-5 flex flex-wrap items-center gap-4">
           <div className="flex gap-1">

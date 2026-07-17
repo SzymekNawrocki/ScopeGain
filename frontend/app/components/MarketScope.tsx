@@ -77,7 +77,7 @@ export function MarketScope() {
 
   return (
     <div className="mb-12">
-      <TerminalWindow title={`~/market/${ticker}`}>
+      <TerminalWindow title={ticker}>
         {/* Sterowanie: wyszukiwarka + zakres */}
         <div className="mb-5 flex flex-wrap items-center gap-4">
           <SearchBox value={ticker} onPick={setTicker} />

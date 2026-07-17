@@ -45,7 +45,7 @@ export function BehaviorReport() {
 
   return (
     <div>
-      <TerminalWindow title={`~/behavior${behavior ? `/${behavior.name}` : ""}`}>
+      <TerminalWindow title={`Zachowanie${behavior ? ` — ${behavior.name}` : ""}`}>
         <p className="mb-5 max-w-2xl font-mono text-xs leading-relaxed text-muted-foreground">
           <span className="text-accent">$</span> zapisz swoje kupna i sprzedaze. Apka porowna
           cene <span className="text-foreground">sprzedazy</span> z dzisiejsza i powie, czy

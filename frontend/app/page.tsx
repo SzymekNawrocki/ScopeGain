@@ -22,9 +22,6 @@ export default function Dashboard() {
         <main id="top" className="mx-auto max-w-7xl px-6 py-12">
           {/* NAGLOWEK */}
           <header className="mb-12">
-            <p className="mb-3 font-mono text-sm uppercase tracking-[0.3em] text-accent-tertiary">
-              <span className="text-accent">$</span> ./scopegain --connect
-            </p>
             <h1 className="font-display text-6xl font-black uppercase tracking-widest text-foreground sm:text-7xl">
               ScopeGain
             </h1>

@@ -42,7 +42,7 @@ export function RealPerformanceReport() {
 
   return (
     <div>
-      <TerminalWindow title={`~/real-path${data ? `/${data.name}` : ""}`}>
+      <TerminalWindow title={`Realna ścieżka${data ? ` — ${data.name}` : ""}`}>
         <p className="mb-5 max-w-2xl font-mono text-xs leading-relaxed text-muted-foreground">
           <span className="text-accent">$</span> to co <span className="text-foreground">NAPRAWDE</span>{" "}
           trzymales dzien po dniu, z Twojego logu transakcji — metoda TWR (dokupienia

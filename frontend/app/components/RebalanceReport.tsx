@@ -43,7 +43,7 @@ export function RebalanceReport() {
 
   return (
     <div>
-      <TerminalWindow title={`~/rebalance${plan ? `/${plan.name}` : ""}`}>
+      <TerminalWindow title={`Rebalans${plan ? ` — ${plan.name}` : ""}`}>
         <p className="mb-5 max-w-2xl font-mono text-xs leading-relaxed text-muted-foreground">
           <span className="text-accent">$</span> punkt odniesienia:{" "}
           <span className="text-foreground">rowne wagi (1/N)</span> jako neutralna miara

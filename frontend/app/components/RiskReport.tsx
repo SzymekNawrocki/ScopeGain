@@ -57,7 +57,7 @@ export function RiskReport() {
 
   return (
     <div>
-      <TerminalWindow title={`~/risk${risk ? `/${risk.name}` : ""}`}>
+      <TerminalWindow title={`Ryzyko${risk ? ` — ${risk.name}` : ""}`}>
         {/* Sterowanie: okno estymacji VaR (wybor portfela jest wspolny, na gorze) */}
         <div className="mb-5 flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">

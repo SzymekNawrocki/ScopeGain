@@ -54,7 +54,7 @@ export function ThemesWorkspace() {
 
   return (
     <section>
-      <SectionLabel>./themes --curate</SectionLabel>
+      <SectionLabel>Twoje tematy</SectionLabel>
       <p className="mb-5 max-w-2xl font-mono text-sm leading-relaxed text-muted-foreground">
         Twoje pomysły inwestycyjne jako koszyki. Do każdej spółki zapisujesz{" "}
         <span className="text-accent">tezę</span> i{" "}
@@ -178,7 +178,7 @@ function ThemeDetail({
 
   return (
     <TerminalWindow
-      title={`~/themes/${theme.name}`}
+      title={theme.name}
       actions={
         <button
           onClick={removeTheme}
