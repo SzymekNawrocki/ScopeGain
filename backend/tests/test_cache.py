@@ -136,6 +136,41 @@ def test_wyjatek_nie_jest_cachowany():
     assert fn("AAPL") == "ok"
 
 
+# --- cache_if: nie betonuj niepelnej odpowiedzi -----------------------------
+
+def test_cache_if_nie_zapamietuje_odrzuconego_wyniku():
+    """Zrodlo potrafi oddac odpowiedz URWANA (czesc pol brakuje). Zapisana na
+    12 h, pokazywalaby userowi ogryzek przez pol dnia - a nastepne pytanie
+    dostaloby komplet. Realny przypadek: profil Cameco bez branzy i marzy."""
+    zegar = FakeClock()
+    stan = {"pelne": False, "n": 0}
+
+    @ttl_cache(100, now=zegar, cache_if=lambda p: bool(p.get("summary")))
+    def profil(t):
+        stan["n"] += 1
+        return {"ticker": t, "summary": "opis" if stan["pelne"] else None}
+
+    profil("CCJ")           # niepelne -> nie wpada do cache'u
+    profil("CCJ")
+    assert stan["n"] == 2   # pytamy zrodlo ponownie zamiast betonowac ogryzek
+
+    stan["pelne"] = True
+    assert profil("CCJ")["summary"] == "opis"
+    n_po_pelnym = stan["n"]
+    profil("CCJ")           # pelne -> juz z cache'u
+    assert stan["n"] == n_po_pelnym
+
+
+def test_bez_cache_if_zapamietujemy_wszystko():
+    zegar = FakeClock()
+    fn, w = licznik_wywolan()
+    cached = ttl_cache(100, now=zegar)(fn)
+
+    cached("X")
+    cached("X")
+    assert w["n"] == 1
+
+
 # --- maxsize ----------------------------------------------------------------
 
 def test_maxsize_ogranicza_wzrost():

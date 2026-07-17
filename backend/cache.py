@@ -22,6 +22,7 @@ def ttl_cache(
     *,
     now: Callable[[], float] = time.monotonic,
     maxsize: int = 256,
+    cache_if: Callable[[object], bool] | None = None,
 ):
     """Dekorator: zapamietuje wynik funkcji na ttl_seconds.
 
@@ -31,6 +32,12 @@ def ttl_cache(
 
     maxsize: podpowiedzi tworza nowy klucz z KAZDEGO wpisanego znaku
     ("c", "ca", "cam"...), wiec bez limitu slownik rosnie w nieskonczonosc.
+
+    cache_if: predykat "czy ten wynik warto zapamietac". Domyslnie zapamietujemy
+    wszystko. Potrzebne, bo darmowe zrodlo potrafi oddac ODPOWIEDZ NIEPELNA
+    (czesc pol brakuje) - a taka, zapisana na 12 h, pokazywalaby userowi
+    okrojone dane przez pol dnia, mimo ze jedno ponowne pytanie by je
+    naprawilo. Widziane na zywo: profil Cameco bez branzy i marzy.
 
     Owinieta funkcja dostaje .cache_clear() (jak w lru_cache) - do testow.
     """
@@ -60,6 +67,12 @@ def ttl_cache(
             # jednym uzytkowniku to nie problem, a zamek per-klucz to
             # zlozonosc bez wartosci.
             wynik = func(*args, **kwargs)
+
+            # Wynik podejrzany (np. niepelna odpowiedz zrodla) - oddajemy go,
+            # ale NIE zapamietujemy, zeby nastepne pytanie mialo szanse
+            # dostac komplet.
+            if cache_if is not None and not cache_if(wynik):
+                return wynik
 
             with zamek:
                 # Wyjatek tu nie dojdzie (poleci wyzej) i to jest CELOWE:

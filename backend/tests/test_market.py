@@ -8,7 +8,7 @@ prawdziwy dict lapie blad, ktory realnie wystapi: dostawca zmienil nazwe pola.
 Dane ponizej pochodza z odpowiedzi Yahoo z 2026-07-17 (skrocone).
 """
 
-from market import _normalize_info, _normalize_quote
+from market import _normalize_info, _normalize_quote, _profil_wart_zapamietania
 
 # --- Zamrozone odpowiedzi ---------------------------------------------------
 
@@ -162,3 +162,44 @@ def test_info_bez_nazwy_ale_z_cena_przechodzi():
     r = _normalize_info("XYZ", {"regularMarketPrice": 10.0})
     assert r is not None
     assert r["name"] == "XYZ"
+
+
+# --- czy profil warto zapamietac (obrona przed urwana odpowiedzia) ----------
+
+def test_pelny_profil_spolki_wart_zapamietania():
+    assert _profil_wart_zapamietania(_normalize_info("CCJ", INFO_CCJ)) is True
+
+
+def test_etf_bez_sektora_ale_z_opisem_wart_zapamietania():
+    """ETF-y (URA, SPY) LEGALNIE nie maja sektora, branzy ani kapitalizacji -
+    ale maja opis. Nie wolno ich mylic z urwana odpowiedzia."""
+    etf = _normalize_info("URA", {
+        "shortName": "Global X Uranium ETF",
+        "regularMarketPrice": 41.2,
+        "longBusinessSummary": "The fund invests in uranium miners...",
+        "currency": "USD",
+    })
+    assert etf["sector"] is None
+    assert etf["market_cap"] is None
+    assert _profil_wart_zapamietania(etf) is True
+
+
+def test_urwana_odpowiedz_nie_wart_zapamietania():
+    """Realny przypadek z 2026-07-17: Yahoo oddalo ceny i wskazniki, ale bez
+    modulu profilowego - branza, marza i opis puste. Zapisane na 12 h,
+    zostaloby na ekranie przez pol dnia."""
+    urwane = _normalize_info("CCJ", {
+        "shortName": "Cameco Corporation",
+        "marketCap": 38048161792,
+        "trailingPE": 83.2,
+        "regularMarketPrice": 71.0,
+        # brak: sector, industry, profitMargins, longBusinessSummary
+    })
+    assert urwane["market_cap"] == 38048161792   # dane sa...
+    assert urwane["industry"] is None            # ...ale niepelne
+    assert _profil_wart_zapamietania(urwane) is False
+
+
+def test_brak_spolki_wart_zapamietania():
+    """None = 'nie ma takiej spolki' - to trwaly fakt, nie awaria."""
+    assert _profil_wart_zapamietania(None) is True

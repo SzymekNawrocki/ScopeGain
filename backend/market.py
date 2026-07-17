@@ -266,7 +266,25 @@ def search_companies(query: str, limit: int = 8) -> list[dict]:
     return [z for z in znalezione if z is not None][:limit]
 
 
-@ttl_cache(PROFILE_TTL)
+def _profil_wart_zapamietania(profil: dict | None) -> bool:
+    """Czy ta odpowiedz wyglada na PELNA (a nie na urwana w polowie)?
+
+    Yahoo potrafi oddac .info bez modulu profilowego: ceny i wskazniki sa,
+    ale sektora, branzy, marzy i opisu juz nie. Widziane na zywo: profil
+    Cameco pokazal kapitalizacje i P/E, a branze i marze jako "-". Zapisany
+    na 12 h, taki ogryzek zostalby na ekranie przez pol dnia.
+
+    Sygnal: OPIS BIZNESU. Maja go i spolki, i ETF-y - wiec jego brak znaczy
+    "modul profilowy nie dojechal", a nie "to ETF". (Sektor sie nie nadaje:
+    ETF-y jak URA czy SPY legalnie nie maja ani sektora, ani branzy, ani
+    kapitalizacji.) None przepuszczamy - "nie ma takiej spolki" to trwaly fakt.
+    """
+    if profil is None:
+        return True
+    return bool(profil.get("summary"))
+
+
+@ttl_cache(PROFILE_TTL, cache_if=_profil_wart_zapamietania)
 def company_profile(ticker: str) -> dict | None:
     """Profil spolki: czym ona jest (sektor, branza, opis) + fundamenty.
 
