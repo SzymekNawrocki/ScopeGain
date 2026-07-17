@@ -1,10 +1,11 @@
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException, Path, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
 import pandas as pd
 import yfinance as yf
 
 from analysis import build_stock_verdict
+from security import get_current_user
 from market import (
     BENCHMARK,
     MarketUnavailable,
@@ -22,7 +23,13 @@ from schemas import StockProfile, StockSearchHit, StockVerdict
 
 # APIRouter = "mini-aplikacja" z wlasnymi trasami. Endpointy pisze sie na
 # router, a nie na app. tags=[...] grupuje te trasy w /docs pod naglowkiem.
-router = APIRouter(tags=["stock"])
+#
+# dependencies na ROUTERZE = auth obejmuje wszystkie trasy /stock naraz i nie
+# da sie jej zapomniec przy dopisywaniu nowej (ten sam chwyt co w portfolios).
+# Po co auth na danych publicznych? Bo /stock/search bez niej to otwarte proxy
+# do Yahoo: ktokolwiek spali limit naszego IP, a podpowiedzi mnoza zapytania.
+# Front i tak renderuje te sekcje pod AuthGate, wiec UX sie nie zmienia.
+router = APIRouter(tags=["stock"], dependencies=[Depends(get_current_user)])
 
 # Realne symbole to nie tylko litery: BRK.B (klasa akcji), CCO.TO (Toronto),
 # U-UN.TO (unit trust), ^GSPC (indeks). Sam [A-Z]+ zepsulby cross-listing.
