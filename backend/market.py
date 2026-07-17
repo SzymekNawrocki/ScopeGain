@@ -8,9 +8,29 @@ dostawce danych, ruszamy tylko ten plik. To tez ulatwia testy (mozna podmienic).
 import requests
 import pandas as pd
 import yfinance as yf
+from yfinance.exceptions import YFRateLimitError
+
+from cache import ttl_cache
 
 # S&P 500 przez ETF SPY - nasz "rynek", do ktorego porownujemy wyniki.
 BENCHMARK = "SPY"
+
+# Jak dlugo trzymamy dane w cache'u. Fundamenty sa wolnozmienne (sektor
+# spolki nie zmieni sie do jutra), podpowiedzi tez - stad godziny, nie sekundy.
+SEARCH_TTL = 60 * 60          # 1 h
+PROFILE_TTL = 12 * 60 * 60    # 12 h
+
+
+class MarketUnavailable(Exception):
+    """Dostawca danych odmowil (limit zapytan / awaria) - to NIE jest 'brak
+    takiej spolki'.
+
+    Rozroznienie jest wazne: "nie ma spolki XYZ" to trwaly fakt (404), a
+    "Yahoo chwilowo nie chce gadac" to stan przejsciowy (503, sprobuj za
+    chwile). Wlasny wyjatek zamiast YFRateLimitError, zeby yfinance nie
+    wyciekal do warstwy HTTP - routery lapia MarketUnavailable i nie wiedza,
+    kto jest pod spodem.
+    """
 
 # Okna historycznych krachow do stress testu (data od, data do). Bierzemy
 # szczyt->dolek, zeby zlapac PELNA skale spadku. Uzywane przez endpoint /risk:
@@ -154,3 +174,113 @@ def closes_frame(tickers: list[str], period: str = "6mo") -> pd.DataFrame:
         close = close.to_frame(name=unikalne[0])
     close.columns = [str(c).upper() for c in close.columns]
     return close.dropna()
+
+
+# --- Wyszukiwanie spolek i fundamenty --------------------------------------
+# Do tej pory apka umiala tylko CENY. Zeby user mogl SZUKAC spolki (a nie
+# znac symbol na pamiec) i zobaczyc, czym ona w ogole jest, potrzebne sa dwa
+# nowe zrodla: wyszukiwarka po nazwie i profil (sektor, branza, fundamenty).
+#
+# UWAGA na granice tego zrodla: szukanie po NAZWIE dziala dobrze
+# (Search("cameco") -> CCJ na pierwszym miejscu), ale szukanie TEMATYCZNE
+# jest dziurawe (Search("uranium") NIE zwraca Cameco - najwiekszej spolki
+# uranowej swiata). Dlatego tu wystawiamy tylko szukanie po nazwie; tematy
+# maja wlasny, kuratorowany mechanizm (patrz ADR-0002).
+
+# Co pokazujemy w podpowiedziach. Bez tego filtra wlecialyby kontrakty
+# terminowe, waluty i indeksy - user szuka spolki albo ETF-u.
+_TYPY_W_PODPOWIEDZIACH = ("EQUITY", "ETF")
+
+
+def _normalize_quote(q: dict) -> dict | None:
+    """Surowy wynik z wyszukiwarki -> nasz ksztalt. CZYSTA funkcja (dict->dict).
+
+    Wydzielona, bo to jedyne miejsce, gdzie zalezymy od nazw pol dostawcy.
+    Da sie ja testowac na ZAMROZONYCH prawdziwych odpowiedziach, bez sieci i
+    bez mockow - i wtedy test lapie realny blad (dostawca zmienil klucz), a
+    nie zachowanie mocka.
+
+    None = wpis do pominiecia (nie spolka/ETF albo bez symbolu).
+    """
+    symbol = q.get("symbol")
+    if not symbol or q.get("quoteType") not in _TYPY_W_PODPOWIEDZIACH:
+        return None
+    return {
+        # longname bywa pelniejsze ("Cameco Corporation"), shortname krotsze.
+        "ticker": str(symbol).upper(),
+        "name": q.get("longname") or q.get("shortname") or str(symbol),
+        # Gielda rozroznia CROSS-LISTING: CCJ (NYSE) i CCO.TO (Toronto) to ta
+        # sama firma, ale rozne papiery, waluty i metryki. Nie deduplikowac.
+        "exchange": q.get("exchDisp") or q.get("exchange"),
+        "quote_type": q.get("quoteType"),
+        # Sektor i branza sa juz w wyniku wyszukiwarki - pokazemy je w
+        # podpowiedziach ZA DARMO, bez dodatkowego (wolnego) strzalu w .info.
+        "sector": q.get("sectorDisp") or q.get("sector"),
+        "industry": q.get("industryDisp") or q.get("industry"),
+    }
+
+
+def _normalize_info(ticker: str, info: dict) -> dict | None:
+    """Surowe .info (100+ pol) -> nasz staly ksztalt. CZYSTA funkcja.
+
+    Nie oddajemy .info na zewnatrz: to blob o niestabilnym kontrakcie, a
+    przepuszczenie go zabija sens tego modulu (routery zaczelyby znac pola
+    yfinance). Wszedzie .get() - kazde pole potrafi nie przyjsc.
+
+    None = nie ma takiej spolki.
+    """
+    nazwa = info.get("shortName") or info.get("longName")
+    # Pusty info albo sam ticker bez nazwy i bez ceny = zly symbol.
+    if not nazwa and info.get("regularMarketPrice") is None:
+        return None
+    return {
+        "ticker": ticker.upper(),
+        "name": nazwa or ticker.upper(),
+        "sector": info.get("sector"),
+        "industry": info.get("industry"),
+        "market_cap": info.get("marketCap"),
+        "trailing_pe": info.get("trailingPE"),
+        "beta": info.get("beta"),
+        "profit_margins": info.get("profitMargins"),
+        "currency": info.get("currency"),
+        "summary": info.get("longBusinessSummary"),
+    }
+
+
+@ttl_cache(SEARCH_TTL)
+def search_companies(query: str, limit: int = 8) -> list[dict]:
+    """Podpowiedzi do wyszukiwarki: szukanie spolki PO NAZWIE lub symbolu.
+
+    Zwraca liste [{ticker, name, exchange, quote_type, sector, industry}].
+    Pusta lista = nic nie znaleziono.
+    """
+    try:
+        # news_count/lists_count=0: domyslnie yfinance dociaga 8 newsow i 8
+        # list, ktorych nie uzywamy - to darmowy narzut na kazde zapytanie.
+        wynik = yf.Search(query, max_results=limit, news_count=0, lists_count=0)
+        quotes = wynik.quotes or []
+    except YFRateLimitError as e:
+        raise MarketUnavailable("Limit zapytan do zrodla danych.") from e
+
+    znalezione = [_normalize_quote(q) for q in quotes]
+    return [z for z in znalezione if z is not None][:limit]
+
+
+@ttl_cache(PROFILE_TTL)
+def company_profile(ticker: str) -> dict | None:
+    """Profil spolki: czym ona jest (sektor, branza, opis) + fundamenty.
+
+    None = nie ma takiej spolki. MarketUnavailable = zrodlo odmowilo.
+    Uwaga: .info NIE da sie pobrac hurtem (strzal na spolke) i bywa wolne
+    (1-3 s na zimno) - stad cache na 12 h.
+    """
+    try:
+        info = yf.Ticker(ticker).info or {}
+    except YFRateLimitError as e:
+        raise MarketUnavailable("Limit zapytan do zrodla danych.") from e
+    except Exception:
+        # yfinance przy zlym symbolu potrafi rzucic czym popadnie zamiast
+        # oddac pusty dict - dla nas to po prostu "nie ma takiej spolki".
+        return None
+
+    return _normalize_info(ticker, info)
