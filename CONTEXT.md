@@ -65,6 +65,14 @@ zmaterializuje do 2027”). Bez niego decyzji nie da się później uczciwie roz
 typ bez warunku porażki wygląda zawsze na trafny. To dyscyplina, nie sygnał (ADR-0001).
 _Unikaj_: stop-loss (to nie zlecenie ani mechanika day-tradingu — patrz ADR-0003).
 
+**Realizacja** — **potwierdzone** powiązanie Obserwacji z Transakcją, która wykonała ten
+typ. Apka ją tylko **proponuje** (widzi kupno tej spółki po dacie dodania typu i pyta
+„to realizacja tego typu?”), a użytkownik **potwierdza** — bo samo posiadanie tickera nie
+znaczy, że kupił pod tę tezę (mógł mieć od dawna albo w innym portfelu). Bez potwierdzenia
+typ pozostaje **nietknięty**. To ta sama zasada co przy kandydatach (ADR-0002): apka
+podsuwa, użytkownik decyduje.
+_Unikaj_: „acted” jako automatyczna flaga z dopasowania tickera.
+
 ---
 
 ## Co apka mówi
