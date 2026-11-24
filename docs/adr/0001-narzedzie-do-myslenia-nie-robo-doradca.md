@@ -1,7 +1,7 @@
 # 1. ScopeGain jest narzędziem do myślenia, nie robo-doradcą
 
 Data: 2026-07-16
-Status: przyjęte
+Status: zastąpione przez [ADR-0005](0005-local-objective-company-analyzer.md) (2026-11-24)
 
 ## Kontekst
 

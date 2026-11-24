@@ -26,4 +26,4 @@ Dozwolone typy (tylko te, nie wymyślaj własnych):
   (unikaj `feat(risk+12b)`, `feat(12c)`, `feat(uczciwosc)` — to ma być `feat:`).
 - Opis krótki, w trybie rozkazującym (np. „dodaj log transakcji", nie „dodano").
 - Szczegóły (warstwy, decyzje, weryfikacja) idą do **treści** commita, nie do typu.
-- Stopka jak zwykle: `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
+- Stopka jak zwykle: `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.

@@ -1,7 +1,7 @@
 # 2. Temat jest koszykiem kuratorowanym, nie wynikiem wyszukiwarki
 
 Data: 2026-07-17
-Status: przyjęte
+Status: zastąpione przez [ADR-0005](0005-local-objective-company-analyzer.md) (2026-11-24)
 
 ## Kontekst
 

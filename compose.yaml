@@ -1,0 +1,43 @@
+# ScopeGain runs locally only (ADR-0005). Every port is published on 127.0.0.1,
+# so nothing is reachable from the network.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: scopegain
+      POSTGRES_USER: scopegain
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-scopegain}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scopegain -d scopegain"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://scopegain:${POSTGRES_PASSWORD:-scopegain}@db:5432/scopegain
+      FRONTEND_ORIGINS: http://127.0.0.1:3000,http://localhost:3000
+      SEC_USER_AGENT: ${SEC_USER_AGENT:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8000:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://127.0.0.1:8000
+    depends_on:
+      - backend
+    ports:
+      - "127.0.0.1:3000:3000"
+
+volumes:
+  db-data:
