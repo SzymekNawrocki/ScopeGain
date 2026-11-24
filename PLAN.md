@@ -34,7 +34,7 @@
 - [x] **3. Company card** — verdict, pros and cons, data gaps. First usable version.
 - [x] **4. Statistics** — industry percentiles from SEC `frames`; valuation against the
       company's own history.
-- [ ] **5. Net dividends (PLN)** — verify tax rules first (podatki.gov.pl, double tax
+- [x] **5. Net dividends (PLN)** — verify tax rules first (podatki.gov.pl, double tax
       treaties: PIT-38 vs PIT-36/ZG); NBP rates; dividend safety.
 - [ ] **6. Watchlist** — ticker + note; verdict change with its reason after a new report.
 - [ ] **7. Glossary with link-outs** — what a term means, whether ScopeGain computes it,

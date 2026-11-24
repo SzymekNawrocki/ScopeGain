@@ -94,6 +94,19 @@ export type Argument = {
   threshold: string;
 };
 
+export type DividendInfo = {
+  dps_ttm_usd: number;
+  gross_yield_pct: number | null;
+  net_factor_w8ben: number;
+  net_factor_no_w8ben: number;
+  usd_pln: number | null;
+  net_per_1000_pln?: number;
+  net_per_1000_pln_no_w8ben?: number;
+  dps_net_pln?: number;
+  source: string;
+  assumptions: string[];
+};
+
 export type CompanyAnalysis = {
   ticker: string;
   name: string;
@@ -102,6 +115,7 @@ export type CompanyAnalysis = {
   fiscal_year_end: string | null;
   years_of_data: number;
   market_cap: number | null;
+  dividend: DividendInfo | null;
   as_of: string;
   caveat: string;
   grade: Grade;

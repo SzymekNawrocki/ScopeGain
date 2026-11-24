@@ -29,6 +29,7 @@ def analyze(company: dict, market: dict) -> dict:
         "fiscal_year_end": latest,
         "years_of_data": len(rows),
         "market_cap": mc,
+        "dividend": market.get("dividend"),
         "as_of": date.today().isoformat(),
         "caveat": "Werdykt opisuje stan spółki według ostatniego raportu rocznego. "
                   "Nie jest obietnicą zysku.",

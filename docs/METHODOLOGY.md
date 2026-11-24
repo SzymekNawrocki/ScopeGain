@@ -140,3 +140,31 @@ stated on the share count at filing time; prices are split-adjusted to today). P
 are split-adjusted but not dividend-adjusted. Today's P/E uses the latest close and
 the latest annual EPS. At least 5 past profitable years are needed. Cut-offs:
 **bottom third of its own history pass, middle warn, top third fail**.
+
+## Dividend
+
+### Net dividend in PLN (information, not a pass/fail criterion)
+
+For a Polish tax resident on an ordinary brokerage account holding US shares:
+
+| | With W-8BEN | Without W-8BEN |
+|---|---|---|
+| US withholding | 15% (PL-US treaty 1974, art. 11) | 30% (US statutory rate) |
+| Credit in Poland | 15% | 15% (capped at the treaty rate) |
+| Polish top-up to 19% (PIT-38, section G) | 4% | 4% |
+| Kept | **81%** | **66%** |
+
+The credit cap follows KIS interpretation 0113-KDIPT2-3.4011.303.2025.2.NM (27 May
+2025) and NSA II FSK 1171/22. Some publications cite only the 19% limit; the app uses
+the stricter reading. Net per 1000 PLN = 1000 × trailing-12-month dividend / price ×
+kept share. The PLN amount uses today's NBP mid rate; the law uses the NBP rate from
+the business day before payment. IKE/IKZE do not remove US withholding.
+
+### Dividend safety
+
+| Criterion | Formula | Pass | Warn | Fail | Source |
+|---|---|---|---|---|---|
+| Payout from FCF | dividends paid / (CFO − capex) | ≤ 75% | 75–100% | > 100% or FCF ≤ 0 | fact above 100%; 75% is a convention |
+| Years without a cut | consecutive full years where the regular payment (median per year) did not fall by more than 1% | ≥ 10 | 5–9 | < 5 | Nasdaq US Broad Dividend Achievers (10 years of increases), milder test |
+
+Companies that pay no dividend get "not applicable" for the whole block.

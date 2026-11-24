@@ -1,4 +1,12 @@
-import { Argument, BlockId, CompanyAnalysis, Criterion, Grade, Outcome } from "../lib/api";
+import {
+  Argument,
+  BlockId,
+  CompanyAnalysis,
+  Criterion,
+  DividendInfo,
+  Grade,
+  Outcome,
+} from "../lib/api";
 
 // The company card: verdict first, then pros/cons, then every criterion with its
 // threshold and source. Data gaps sit above the blocks, not in a footer, so a
@@ -77,6 +85,9 @@ export function CompanyCard({ analysis }: { analysis: CompanyAnalysis }) {
         <ArgumentList title="Przeciw" items={analysis.cons} accent="text-destructive" />
       </section>
 
+      {/* NET DIVIDEND (PLN) */}
+      {analysis.dividend && <DividendPanel d={analysis.dividend} />}
+
       {/* BLOCKS */}
       {BLOCK_ORDER.map((id) => {
         const block = analysis.blocks[id];
@@ -152,5 +163,50 @@ function CriterionRow({ c }: { c: Criterion }) {
         <p className="mt-1">{c.source}</p>
       </details>
     </li>
+  );
+}
+
+function pln(x: number | undefined | null, digits = 2): string {
+  return x == null ? "—" : `${x.toFixed(digits).replace(".", ",")} zł`;
+}
+
+function DividendPanel({ d }: { d: DividendInfo }) {
+  return (
+    <section className="cyber-chamfer-sm border border-border bg-card p-4">
+      <p className="mb-3 font-display text-sm font-bold uppercase tracking-widest text-accent-tertiary">
+        Dywidenda na rękę
+      </p>
+      <div className="grid grid-cols-2 gap-4 font-mono md:grid-cols-4">
+        <Stat label="Na każde 1000 zł rocznie" value={pln(d.net_per_1000_pln)} strong />
+        <Stat label="Bez W-8BEN" value={pln(d.net_per_1000_pln_no_w8ben)} />
+        <Stat
+          label="Stopa brutto"
+          value={d.gross_yield_pct == null ? "—" : `${d.gross_yield_pct.toFixed(2).replace(".", ",")}%`}
+        />
+        <Stat label="Na akcję netto" value={pln(d.dps_net_pln, 2)} />
+      </div>
+      <p className="mt-3 font-mono text-xs text-muted-foreground">
+        Z W-8BEN zostaje {Math.round(d.net_factor_w8ben * 100)}% brutto (15% USA + 4% dopłaty w
+        PIT-38), bez niego {Math.round(d.net_factor_no_w8ben * 100)}%.
+      </p>
+      <ul className="mt-2 list-disc pl-5 font-mono text-[11px] text-muted-foreground">
+        {d.assumptions.map((a) => (
+          <li key={a}>{a}</li>
+        ))}
+      </ul>
+      <details className="mt-2 font-mono text-[11px] text-muted-foreground">
+        <summary className="cursor-pointer select-none hover:text-accent">źródło</summary>
+        <p className="mt-1">{d.source}</p>
+      </details>
+    </section>
+  );
+}
+
+function Stat({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <div>
+      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className={strong ? "text-xl font-bold text-accent" : "text-sm text-foreground"}>{value}</p>
+    </div>
   );
 }

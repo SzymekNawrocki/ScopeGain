@@ -3,7 +3,10 @@ from fastapi import APIRouter, Depends, HTTPException, Path
 from analysis import analyze
 from deps import sec_client
 from facts import annual_financials, reporting_currency_ok
-from market import MarketUnavailable, company_profile
+from datetime import date
+
+from dividends import dividend_block, net_dividend, ttm
+from market import MarketUnavailable, company_profile, dividend_payments, last_close, usd_pln_rate
 from sec import SecClient, SecNotConfigured, SecUnavailable
 from stats_data import history_criteria, industry_criteria
 
@@ -71,7 +74,24 @@ def company_analysis(ticker: str = Path(pattern=TICKER_RE), sec: SecClient = Dep
         raise HTTPException(status_code=404, detail="Brak rocznych raportów 10-K w danych SEC.")
     market = market_snapshot(ticker)
     market["extra_criteria"] = extra_criteria(company, sec, ticker)
+    dividend, criteria = dividend_section(company, ticker)
+    market["extra_criteria"] += criteria
+    market["dividend"] = dividend
     return analyze(company, market)
+
+
+def dividend_section(company: dict, ticker: str) -> tuple[dict | None, list[dict]]:
+    """Net dividend in PLN (info panel) and the dividend-safety criteria."""
+    today = date.today()
+    try:
+        payments = dividend_payments(ticker)
+        price = last_close(ticker)
+    except MarketUnavailable:
+        payments, price = [], None
+    criteria = dividend_block(company["annual"], payments, today)
+    dps = ttm(payments, today)
+    info = net_dividend(dps, price, usd_pln_rate()) if dps > 0 else None
+    return info, criteria
 
 
 def extra_criteria(company: dict, sec: SecClient, ticker: str) -> list[dict]:

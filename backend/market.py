@@ -242,3 +242,20 @@ def closes_on(ticker: str, dates: list[str]) -> tuple[dict[str, float], float | 
         if not before.empty:
             out[d] = float(before.iloc[-1])
     return out, float(series.iloc[-1])
+
+
+@ttl_cache(PROFILE_TTL)
+def dividend_payments(ticker: str) -> list[tuple[str, float]]:
+    """[(date, amount per share)] of cash dividends, split-adjusted. Empty when none."""
+    try:
+        s = yf.Ticker(ticker).dividends
+    except YFRateLimitError as e:
+        raise MarketUnavailable(str(e)) from e
+    except Exception:
+        return []
+    return [(d.strftime("%Y-%m-%d"), float(a)) for d, a in s.items() if a]
+
+
+def last_close(ticker: str) -> float | None:
+    s = close_series(ticker, "5d")
+    return float(s.iloc[-1]) if not s.empty else None
