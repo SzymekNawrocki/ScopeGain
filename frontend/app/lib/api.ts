@@ -133,3 +133,66 @@ export async function getCompanyAnalysis(ticker: string): Promise<CompanyAnalysi
   if (!res.ok) throw new Error(await apiError(res));
   return res.json();
 }
+
+// --- Obserwowane ---
+
+export type VerdictChange = {
+  ticker: string;
+  at: string;
+  from_grade: Grade | null;
+  to_grade: Grade;
+  fiscal_year_end: string | null;
+  reasons: string[];
+};
+
+export type WatchItem = {
+  ticker: string;
+  note: string;
+  added_at: string;
+  checked_at: string | null;
+  grade: Grade | null;
+  fiscal_year_end: string | null;
+  last_change: VerdictChange | null;
+};
+
+async function json<T>(res: Response): Promise<T> {
+  if (!res.ok) throw new Error(await apiError(res));
+  return res.json();
+}
+
+export async function getWatchlist(): Promise<WatchItem[]> {
+  return json(await apiFetch("/watchlist"));
+}
+
+export async function addToWatchlist(ticker: string, note = ""): Promise<WatchItem> {
+  return json(
+    await apiFetch("/watchlist", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ticker, note }),
+    }),
+  );
+}
+
+export async function updateWatchNote(ticker: string, note: string): Promise<WatchItem> {
+  return json(
+    await apiFetch(`/watchlist/${encodeURIComponent(ticker)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ note }),
+    }),
+  );
+}
+
+export async function removeFromWatchlist(ticker: string): Promise<void> {
+  const res = await apiFetch(`/watchlist/${encodeURIComponent(ticker)}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(await apiError(res));
+}
+
+export async function refreshWatchlist(): Promise<{ changes: VerdictChange[]; items: WatchItem[] }> {
+  return json(await apiFetch("/watchlist/refresh", { method: "POST" }));
+}
+
+export async function getVerdictChanges(): Promise<VerdictChange[]> {
+  return json(await apiFetch("/watchlist/changes"));
+}

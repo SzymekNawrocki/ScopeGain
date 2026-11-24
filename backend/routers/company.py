@@ -66,6 +66,11 @@ def market_snapshot(ticker: str) -> dict:
 
 @router.get("/{ticker}/analysis")
 def company_analysis(ticker: str = Path(pattern=TICKER_RE), sec: SecClient = Depends(sec_client)):
+    return run_analysis(ticker, sec)
+
+
+def run_analysis(ticker: str, sec: SecClient) -> dict:
+    """Full analysis for one ticker; raises HTTPException when it cannot be done."""
     company = load_company(ticker, sec)
     if not company["usd"]:
         raise HTTPException(status_code=422,

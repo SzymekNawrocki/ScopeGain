@@ -3,7 +3,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import company, stock
+from routers import company, stock, watchlist
 
 app = FastAPI(title="ScopeGain API")
 
@@ -29,3 +29,4 @@ def health():
 
 app.include_router(stock.router)
 app.include_router(company.router)
+app.include_router(watchlist.router)

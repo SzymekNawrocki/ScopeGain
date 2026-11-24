@@ -6,6 +6,7 @@ import { CompanyCard } from "./CompanyCard";
 import { SearchBox } from "./SearchBox";
 import { StatusPanel } from "./ui/StatusPanel";
 import { TerminalWindow } from "./ui/TerminalWindow";
+import { WatchButton } from "./WatchButton";
 
 // The result always carries the ticker it belongs to. "Loading" = no result yet
 // for the CURRENT ticker, so no setState runs synchronously inside the effect.
@@ -35,8 +36,9 @@ export function CompanyWorkspace({ initialTicker = "AAPL" }: { initialTicker?: s
 
   return (
     <TerminalWindow title="Spółka">
-      <div className="mb-5">
+      <div className="mb-5 flex flex-wrap items-center gap-4">
         <SearchBox value={ticker} onPick={(t) => setTicker(t.toUpperCase())} />
+        {shown?.analysis && <WatchButton key={ticker} ticker={ticker} />}
       </div>
 
       {!shown && (

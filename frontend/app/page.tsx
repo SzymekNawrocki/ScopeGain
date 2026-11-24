@@ -1,9 +1,15 @@
 import { Nav } from "./components/Nav";
 import { CompanyWorkspace } from "./components/CompanyWorkspace";
 
-// Server Component: powloka strony (naglowek) nie ma stanu. Interaktywny jest
-// tylko CompanyWorkspace (wyszukiwarka + profil spolki).
-export default function Dashboard() {
+// Server Component shell. ?t=TICKER opens a company directly (links from the
+// watchlist, or from other tools).
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ t?: string }>;
+}) {
+  const { t } = await searchParams;
+  const ticker = (t ?? "AAPL").toUpperCase();
   return (
     <>
       <Nav />
@@ -18,7 +24,7 @@ export default function Dashboard() {
             <span className="cursor-blink" />
           </p>
         </header>
-        <CompanyWorkspace />
+        <CompanyWorkspace key={ticker} initialTicker={ticker} />
       </main>
     </>
   );
