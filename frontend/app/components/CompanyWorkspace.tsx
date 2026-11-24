@@ -1,49 +1,51 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getStockProfile, StockProfile } from "../lib/api";
+import { CompanyAnalysis, getCompanyAnalysis } from "../lib/api";
+import { CompanyCard } from "./CompanyCard";
 import { SearchBox } from "./SearchBox";
-import { StockProfilePanel } from "./StockProfilePanel";
 import { StatusPanel } from "./ui/StatusPanel";
 import { TerminalWindow } from "./ui/TerminalWindow";
 
-// Wynik zawsze niesie ticker, dla ktorego przyszedl. "Laduje" = nie mamy
-// jeszcze wyniku dla AKTUALNEGO tickera - bez osobnego setLoading w efekcie.
+// The result always carries the ticker it belongs to. "Loading" = no result yet
+// for the CURRENT ticker, so no setState runs synchronously inside the effect.
 type Result =
-  | { ticker: string; profile: StockProfile; error: null }
-  | { ticker: string; profile: null; error: string };
+  | { ticker: string; analysis: CompanyAnalysis; error: null }
+  | { ticker: string; analysis: null; error: string };
 
-// Ekran "Spolka": wpisujesz ticker -> apka mowi, czym spolka jest.
-// Szkielet pod karte spolki z plastra 3 (werdykt + Za/Przeciw + braki danych).
-export function CompanyWorkspace() {
-  const [ticker, setTicker] = useState("AAPL");
+export function CompanyWorkspace({ initialTicker = "AAPL" }: { initialTicker?: string }) {
+  const [ticker, setTicker] = useState(initialTicker.toUpperCase());
   const [result, setResult] = useState<Result | null>(null);
 
   useEffect(() => {
-    let aktualne = true; // straznik: ignoruj odpowiedz starego zapytania
-    getStockProfile(ticker)
-      .then((profile) => aktualne && setResult({ ticker, profile, error: null }))
+    let current = true; // ignore a response that arrives after the ticker changed
+    getCompanyAnalysis(ticker)
+      .then((analysis) => current && setResult({ ticker, analysis, error: null }))
       .catch(
         (e) =>
-          aktualne &&
-          setResult({ ticker, profile: null, error: e.message ?? "Blad pobierania" }),
+          current &&
+          setResult({ ticker, analysis: null, error: e.message ?? "Błąd pobierania" }),
       );
     return () => {
-      aktualne = false;
+      current = false;
     };
   }, [ticker]);
 
-  const current = result?.ticker === ticker ? result : null;
+  const shown = result?.ticker === ticker ? result : null;
 
   return (
     <TerminalWindow title="Spółka">
       <div className="mb-5">
-        <SearchBox value={ticker} onPick={setTicker} />
+        <SearchBox value={ticker} onPick={(t) => setTicker(t.toUpperCase())} />
       </div>
 
-      {!current && <StatusPanel variant="loading">Pobieram profil {ticker}…</StatusPanel>}
-      {current?.error && <StatusPanel variant="error">{current.error}</StatusPanel>}
-      {current?.profile && <StockProfilePanel profile={current.profile} />}
+      {!shown && (
+        <StatusPanel variant="loading">
+          Analizuję {ticker}: sprawozdania z SEC, wycena, ryzyko…
+        </StatusPanel>
+      )}
+      {shown?.error && <StatusPanel variant="error">{shown.error}</StatusPanel>}
+      {shown?.analysis && <CompanyCard analysis={shown.analysis} />}
     </TerminalWindow>
   );
 }

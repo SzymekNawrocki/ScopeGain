@@ -81,3 +81,37 @@ income. Not applied to financial companies.
 Annual change of the diluted share count over up to three years. Share issuance
 predicts lower returns (Pontiff & Woodgate 2008) and is one of Piotroski's signals.
 Thresholds are a convention: **≤ 0% pass, 0–2% warn, > 2% fail**.
+
+## Health
+
+| Criterion | Formula | Pass | Warn | Fail | Source |
+|---|---|---|---|---|---|
+| Net debt / EBITDA | (LTD + current debt − cash) / (operating income + D&A) | < 3 or net cash | 3–4 | > 4 or EBITDA ≤ 0 | S&P Global Ratings (2013) financial risk profile |
+| Interest coverage | EBIT / interest expense | ≥ 2.5 or no debt | 1.5–2.5 | < 1.5 | Damodaran, synthetic rating table (≥ 2.5 ≈ BBB or better) |
+| Current ratio | current assets / current liabilities | ≥ 2 | 1–2 | < 1 | Graham (1973), ch. 14 |
+
+None of these apply to financial companies (SIC 6000–6799).
+
+## Valuation
+
+| Criterion | Formula | Pass | Fail | Source |
+|---|---|---|---|---|
+| Graham multiplier | P/E × P/B = (market cap / net income) × (market cap / equity) | ≤ 22.5 | > 22.5, loss or negative equity | Graham (1973), ch. 14 |
+
+Market capitalisation comes from Yahoo Finance; everything else from SEC filings.
+
+## Verdict rule
+
+Per block: pass = +1, warn = 0, fail = −1; criteria without data are skipped.
+A block is 🟢 with no fail and a positive sum, 🔴 with a negative sum, 🟡 otherwise.
+
+Overall, in this order:
+
+1. 🔴 if a knock-out criterion fired (Beneish).
+2. 🔴 if the Trust block is 🔴.
+3. 🔴 if two or more blocks are 🔴.
+4. 🟡 if fewer than half of the applicable criteria had data.
+5. 🟢 if Trust is 🟢, no block is 🔴 and at least two blocks are 🟢.
+6. 🟡 otherwise.
+
+"Not applicable" (e.g. Altman for a bank) does not count as missing data.

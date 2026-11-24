@@ -59,11 +59,63 @@ export async function getStockProfile(ticker: string): Promise<StockProfile> {
   return res.json();
 }
 
-// --- Werdykt (wspolny ksztalt dla VerdictFindings; nowy werdykt w plastrze 3) ---
-export type Severity = "good" | "warn" | "bad";
+// --- Analiza spolki (karta) ---
 
-export type VerdictFinding = {
-  severity: Severity;
+export type Outcome = "pass" | "warn" | "fail" | "na";
+export type Grade = "good" | "mixed" | "bad";
+export type BlockId = "trust" | "dividend" | "valuation" | "health";
+
+export type Criterion = {
+  id: string;
+  block: BlockId;
+  name: string;
+  outcome: Outcome;
+  value: number | null;
+  display: string;
+  threshold: string;
+  source: string;
+  meaning: string;
+  missing: string[];
+  knockout: boolean;
+};
+
+export type Block = {
+  name: string;
+  status: Grade | "na";
+  counts: Record<Outcome, number>;
+  criteria: Criterion[];
+};
+
+export type Argument = {
+  id: string;
+  severity: Outcome;
   title: string;
   detail: string;
+  threshold: string;
 };
+
+export type CompanyAnalysis = {
+  ticker: string;
+  name: string;
+  sic: string | null;
+  sic_description: string | null;
+  fiscal_year_end: string | null;
+  years_of_data: number;
+  market_cap: number | null;
+  as_of: string;
+  caveat: string;
+  grade: Grade;
+  label: string;
+  reason: string;
+  coverage: { checked: number; applicable: number };
+  blocks: Partial<Record<BlockId, Block>>;
+  pros: Argument[];
+  cons: Argument[];
+  data_gaps: { criterion: string; missing: string[] }[];
+};
+
+export async function getCompanyAnalysis(ticker: string): Promise<CompanyAnalysis> {
+  const res = await apiFetch(`/company/${encodeURIComponent(ticker)}/analysis`);
+  if (!res.ok) throw new Error(await apiError(res));
+  return res.json();
+}

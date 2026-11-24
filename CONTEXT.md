@@ -20,14 +20,16 @@ theme, thesis.
 ## What the app says
 
 **Verdict** — 🟢 worth considering / 🟡 borderline / 🔴 not worth it. It follows from a
-fixed, documented rule over the **Blocks**, never from anyone's opinion. It describes
+fixed, documented rule over the **Blocks** ([METHODOLOGY](docs/METHODOLOGY.md#verdict-rule)),
+never from anyone's opinion. It describes
 the company today; it does not promise a return.
 
 **Block** — a group of criteria: **Trust**, **Dividend**, **Valuation**, **Health**.
 Each block shows how many criteria passed, failed or lacked data.
 
 **Criterion** — one check with a value, a threshold and a **Source**. Outcome is
-✅ passed, ❌ failed or ⚪ no data.
+✅ passed, 🟡 middle zone (where the source defines one, e.g. Altman's grey zone),
+❌ failed or ⚪ no data. "Not applicable" (e.g. Altman for a bank) is not a data gap.
 
 **Knock-out criterion** — a criterion that ends the analysis with 🔴 on its own.
 Currently: Beneish M-Score above the manipulation threshold.

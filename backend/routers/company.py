@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Path
 
+from analysis import analyze
 from deps import sec_client
 from facts import annual_financials, reporting_currency_ok
+from market import MarketUnavailable, company_profile
 from sec import SecClient, SecNotConfigured, SecUnavailable
 
 router = APIRouter(prefix="/company", tags=["company"])
@@ -45,3 +47,23 @@ def financials(ticker: str = Path(pattern=TICKER_RE), sec: SecClient = Depends(s
     latest = company["annual"][-1] if company["annual"] else {}
     company["data_gaps"] = sorted(k for k, v in latest.items() if v is None)
     return company
+
+
+def market_snapshot(ticker: str) -> dict:
+    """Market cap from Yahoo. Missing is fine: criteria that need it become 'no data'."""
+    try:
+        profile = company_profile(ticker) or {}
+    except MarketUnavailable:
+        profile = {}
+    return {"market_cap": profile.get("market_cap"), "currency": profile.get("currency")}
+
+
+@router.get("/{ticker}/analysis")
+def company_analysis(ticker: str = Path(pattern=TICKER_RE), sec: SecClient = Depends(sec_client)):
+    company = load_company(ticker, sec)
+    if not company["usd"]:
+        raise HTTPException(status_code=422,
+                            detail="Spółka raportuje w innej walucie niż USD. ScopeGain tego nie przelicza.")
+    if not company["annual"]:
+        raise HTTPException(status_code=404, detail="Brak rocznych raportów 10-K w danych SEC.")
+    return analyze(company, market_snapshot(ticker))

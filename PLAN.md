@@ -31,7 +31,7 @@
       max 10 requests/s, User-Agent from `.env`.
 - [x] **2. Trust** — Piotroski F-Score, Altman Z-Score, Beneish M-Score (knock-out) as
       pure functions, tested on known examples from the literature.
-- [ ] **3. Company card** — verdict, pros and cons, data gaps. First usable version.
+- [x] **3. Company card** — verdict, pros and cons, data gaps. First usable version.
 - [ ] **4. Statistics** — industry percentiles from SEC `frames`; valuation against the
       company's own history.
 - [ ] **5. Net dividends (PLN)** — verify tax rules first (podatki.gov.pl, double tax
