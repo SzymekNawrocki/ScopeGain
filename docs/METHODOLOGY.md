@@ -115,3 +115,28 @@ Overall, in this order:
 6. 🟡 otherwise.
 
 "Not applicable" (e.g. Altman for a bank) does not count as missing data.
+
+## Statistics
+
+### Industry percentiles (Health block)
+
+Peers are companies registered under the same SIC code in EDGAR (company browse).
+Their values come from the SEC XBRL `frames` API for the calendar year the company's
+fiscal year mostly overlaps (fiscal years ending in July or later map to that year).
+
+| Criterion | Company value | Peer value |
+|---|---|---|
+| Operating margin | operating income / revenue | `OperatingIncomeLoss` / (`Revenues`, else `RevenueFromContractWithCustomerExcludingAssessedTax`) |
+| ROA | net income / total assets | `NetIncomeLoss` / `Assets` (year-end instant) |
+
+Percentile = share of peers below the company (ties count half). At least 10 peers
+are needed. Cut-offs are a convention: **top third pass, middle warn, bottom third fail**.
+
+### P/E against the company's own history (Valuation block)
+
+P/E at each fiscal-year end = closing price on that date / diluted EPS of that year.
+EPS is divided by every stock split that happened **after the filing date** (EPS is
+stated on the share count at filing time; prices are split-adjusted to today). Prices
+are split-adjusted but not dividend-adjusted. Today's P/E uses the latest close and
+the latest annual EPS. At least 5 past profitable years are needed. Cut-offs:
+**bottom third of its own history pass, middle warn, top third fail**.

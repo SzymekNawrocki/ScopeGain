@@ -59,3 +59,14 @@ def test_no_us_gaap_means_no_rows_and_currency_check():
     assert annual_financials({"facts": {"ifrs-full": {}}}) == []
     assert reporting_currency_ok(facts({"Assets": [inst(2024, 1)]}))
     assert not reporting_currency_ok({"facts": {"us-gaap": {"Assets": {"units": {"EUR": []}}}}})
+
+
+def test_eps_points_keep_filing_date_for_split_adjustment():
+    from facts import eps_points
+    payload = facts({"EarningsPerShareDiluted": [
+        dur(2019, 11.89, filed="2019-10-31"),
+        dur(2019, 2.97, filed="2021-10-29"),  # restated after the 2020 4:1 split
+        dur(2020, 3.28, filed="2020-10-30"),
+    ]}, unit_overrides={"EarningsPerShareDiluted": "USD/shares"})
+    assert eps_points(payload) == [("2019-09-30", 2.97, "2021-10-29"),
+                                   ("2020-09-30", 3.28, "2020-10-30")]

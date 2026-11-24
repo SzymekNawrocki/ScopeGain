@@ -178,3 +178,25 @@ def reporting_currency_ok(companyfacts: dict) -> bool:
     gaap = companyfacts.get("facts", {}).get("us-gaap", {})
     assets = gaap.get("Assets", {}).get("units", {})
     return "USD" in assets if assets else bool(gaap)
+
+
+def eps_points(companyfacts: dict) -> list[tuple[str, float, str]]:
+    """(fiscal_year_end, diluted EPS, filed) per year, oldest first.
+
+    The filing date matters: EPS is stated on the share count at filing time,
+    so later stock splits must be applied before comparing with today's prices.
+    """
+    gaap = companyfacts.get("facts", {}).get("us-gaap", {})
+    best: dict[date, tuple[str, float]] = {}
+    for tag in ("EarningsPerShareDiluted", "EarningsPerShareBasic"):
+        for e in gaap.get(tag, {}).get("units", {}).get("USD/shares", []):
+            if e.get("form") not in ANNUAL_FORMS or "start" not in e:
+                continue
+            if not 300 <= (_d(e["end"]) - _d(e["start"])).days <= 400:
+                continue
+            end, filed = _d(e["end"]), e.get("filed", "")
+            if end not in best or filed > best[end][0]:
+                best[end] = (filed, float(e["val"]))
+        if best:
+            break
+    return [(d.isoformat(), v, f) for d, (f, v) in sorted(best.items())][-MAX_YEARS:]

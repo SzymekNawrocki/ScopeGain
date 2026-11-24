@@ -129,6 +129,7 @@ def test_analysis_endpoint_end_to_end(monkeypatch):
         "ticker": t.upper(), "cik": 1, "name": "Test", "sic": "3571",
         "sic_description": "Computers", "usd": True, "annual": rows})
     monkeypatch.setattr(company_router, "market_snapshot", lambda t: {"market_cap": 1500})
+    monkeypatch.setattr(company_router, "extra_criteria", lambda c, s, t: [])
     main.app.dependency_overrides[sec_client] = lambda: None
     try:
         res = TestClient(main.app).get("/company/test/analysis")

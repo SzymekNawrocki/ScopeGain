@@ -32,7 +32,7 @@
 - [x] **2. Trust** — Piotroski F-Score, Altman Z-Score, Beneish M-Score (knock-out) as
       pure functions, tested on known examples from the literature.
 - [x] **3. Company card** — verdict, pros and cons, data gaps. First usable version.
-- [ ] **4. Statistics** — industry percentiles from SEC `frames`; valuation against the
+- [x] **4. Statistics** — industry percentiles from SEC `frames`; valuation against the
       company's own history.
 - [ ] **5. Net dividends (PLN)** — verify tax rules first (podatki.gov.pl, double tax
       treaties: PIT-38 vs PIT-36/ZG); NBP rates; dividend safety.

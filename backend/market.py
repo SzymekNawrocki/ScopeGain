@@ -64,14 +64,16 @@ def close_series(ticker: str, period: str = "6mo") -> pd.Series:
     return close.dropna()
 
 
-def close_series_range(ticker: str, start: str, end: str | None = None) -> pd.Series:
+def close_series_range(ticker: str, start: str, end: str | None = None,
+                       dividend_adjusted: bool = True) -> pd.Series:
     """Ceny zamkniecia jednej spolki miedzy dwiema DATAMI (nie 'period').
 
     end=None -> yfinance ciagnie do dzis. Pusta Series = spolka wtedy nie
     istniala albo brak danych. Przyda sie do wyceny na tle historii (plaster 4).
     """
     dane = yf.download(
-        ticker, start=start, end=end, interval="1d", progress=False, auto_adjust=True
+        ticker, start=start, end=end, interval="1d", progress=False,
+        auto_adjust=dividend_adjusted,
     )
     if dane.empty:
         return pd.Series(dtype=float)
@@ -207,3 +209,36 @@ def company_profile(ticker: str) -> dict | None:
         return None
 
     return _normalize_info(ticker, info)
+
+
+@ttl_cache(PROFILE_TTL)
+def split_history(ticker: str) -> list[tuple[str, float]]:
+    """[(date, ratio)] of stock splits, e.g. ("2020-08-31", 4.0). Empty when none or unknown."""
+    try:
+        s = yf.Ticker(ticker).splits
+    except YFRateLimitError as e:
+        raise MarketUnavailable(str(e)) from e
+    except Exception:
+        return []
+    return [(d.strftime("%Y-%m-%d"), float(r)) for d, r in s.items() if r]
+
+
+def closes_on(ticker: str, dates: list[str]) -> tuple[dict[str, float], float | None]:
+    """Closing price on (or just before) each date, plus the latest close."""
+    if not dates:
+        return {}, None
+    start = (pd.Timestamp(min(dates)) - pd.Timedelta(days=10)).strftime("%Y-%m-%d")
+    try:
+        # Split-adjusted but NOT dividend-adjusted: P/E uses the price actually paid.
+        series = close_series_range(ticker, start, dividend_adjusted=False)
+    except YFRateLimitError as e:
+        raise MarketUnavailable(str(e)) from e
+    if series.empty:
+        return {}, None
+    series.index = pd.to_datetime(series.index).tz_localize(None)
+    out = {}
+    for d in dates:
+        before = series[series.index <= pd.Timestamp(d)]
+        if not before.empty:
+            out[d] = float(before.iloc[-1])
+    return out, float(series.iloc[-1])

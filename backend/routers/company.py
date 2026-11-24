@@ -5,6 +5,7 @@ from deps import sec_client
 from facts import annual_financials, reporting_currency_ok
 from market import MarketUnavailable, company_profile
 from sec import SecClient, SecNotConfigured, SecUnavailable
+from stats_data import history_criteria, industry_criteria
 
 router = APIRouter(prefix="/company", tags=["company"])
 
@@ -38,12 +39,14 @@ def load_company(ticker: str, sec: SecClient) -> dict:
         "sic_description": meta.get("sicDescription"),
         "usd": reporting_currency_ok(facts),
         "annual": annual_financials(facts),
+        "facts": facts,  # raw payload for criteria that need more than annual rows
     }
 
 
 @router.get("/{ticker}/financials")
 def financials(ticker: str = Path(pattern=TICKER_RE), sec: SecClient = Depends(sec_client)):
     company = load_company(ticker, sec)
+    company.pop("facts", None)
     latest = company["annual"][-1] if company["annual"] else {}
     company["data_gaps"] = sorted(k for k, v in latest.items() if v is None)
     return company
@@ -66,4 +69,11 @@ def company_analysis(ticker: str = Path(pattern=TICKER_RE), sec: SecClient = Dep
                             detail="Spółka raportuje w innej walucie niż USD. ScopeGain tego nie przelicza.")
     if not company["annual"]:
         raise HTTPException(status_code=404, detail="Brak rocznych raportów 10-K w danych SEC.")
-    return analyze(company, market_snapshot(ticker))
+    market = market_snapshot(ticker)
+    market["extra_criteria"] = extra_criteria(company, sec, ticker)
+    return analyze(company, market)
+
+
+def extra_criteria(company: dict, sec: SecClient, ticker: str) -> list[dict]:
+    """Criteria that need data beyond the company's own filings (peers, prices)."""
+    return industry_criteria(company, sec) + history_criteria(company, company.get("facts"), ticker)
