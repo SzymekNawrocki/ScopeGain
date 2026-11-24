@@ -1,0 +1,104 @@
+from fastapi import APIRouter, Depends, HTTPException, Path
+
+from analysis import analyze
+from deps import sec_client
+from facts import annual_financials, reporting_currency_ok
+from datetime import date
+
+from dividends import dividend_block, net_dividend, ttm
+from market import MarketUnavailable, company_profile, dividend_payments, last_close, usd_pln_rate
+from sec import SecClient, SecNotConfigured, SecUnavailable
+from stats_data import history_criteria, industry_criteria
+
+router = APIRouter(prefix="/company", tags=["company"])
+
+TICKER_RE = r"^[A-Za-z0-9.\-]{1,15}$"
+
+
+def load_company(ticker: str, sec: SecClient) -> dict:
+    """CIK, metadata and annual financials for a ticker, or an HTTP error."""
+    try:
+        cik = sec.cik_for(ticker)
+        if cik is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"SEC nie zna spółki '{ticker.upper()}'. ScopeGain analizuje spółki "
+                       "raportujące do SEC (USA). Spółki z GPW sprawdzisz na Biznesradarze.",
+            )
+        facts = sec.company_facts(cik)
+        meta = sec.submissions(cik) or {}
+    except SecNotConfigured as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except SecUnavailable:
+        raise HTTPException(status_code=503, detail="SEC chwilowo nie odpowiada. Spróbuj za chwilę.")
+
+    if not facts:
+        raise HTTPException(status_code=404, detail="SEC nie ma danych finansowych tej spółki.")
+    return {
+        "ticker": ticker.upper(),
+        "cik": cik,
+        "name": facts.get("entityName") or meta.get("name"),
+        "sic": meta.get("sic"),
+        "sic_description": meta.get("sicDescription"),
+        "usd": reporting_currency_ok(facts),
+        "annual": annual_financials(facts),
+        "facts": facts,  # raw payload for criteria that need more than annual rows
+    }
+
+
+@router.get("/{ticker}/financials")
+def financials(ticker: str = Path(pattern=TICKER_RE), sec: SecClient = Depends(sec_client)):
+    company = load_company(ticker, sec)
+    company.pop("facts", None)
+    latest = company["annual"][-1] if company["annual"] else {}
+    company["data_gaps"] = sorted(k for k, v in latest.items() if v is None)
+    return company
+
+
+def market_snapshot(ticker: str) -> dict:
+    """Market cap from Yahoo. Missing is fine: criteria that need it become 'no data'."""
+    try:
+        profile = company_profile(ticker) or {}
+    except MarketUnavailable:
+        profile = {}
+    return {"market_cap": profile.get("market_cap"), "currency": profile.get("currency")}
+
+
+@router.get("/{ticker}/analysis")
+def company_analysis(ticker: str = Path(pattern=TICKER_RE), sec: SecClient = Depends(sec_client)):
+    return run_analysis(ticker, sec)
+
+
+def run_analysis(ticker: str, sec: SecClient) -> dict:
+    """Full analysis for one ticker; raises HTTPException when it cannot be done."""
+    company = load_company(ticker, sec)
+    if not company["usd"]:
+        raise HTTPException(status_code=422,
+                            detail="Spółka raportuje w innej walucie niż USD. ScopeGain tego nie przelicza.")
+    if not company["annual"]:
+        raise HTTPException(status_code=404, detail="Brak rocznych raportów 10-K w danych SEC.")
+    market = market_snapshot(ticker)
+    market["extra_criteria"] = extra_criteria(company, sec, ticker)
+    dividend, criteria = dividend_section(company, ticker)
+    market["extra_criteria"] += criteria
+    market["dividend"] = dividend
+    return analyze(company, market)
+
+
+def dividend_section(company: dict, ticker: str) -> tuple[dict | None, list[dict]]:
+    """Net dividend in PLN (info panel) and the dividend-safety criteria."""
+    today = date.today()
+    try:
+        payments = dividend_payments(ticker)
+        price = last_close(ticker)
+    except MarketUnavailable:
+        payments, price = [], None
+    criteria = dividend_block(company["annual"], payments, today)
+    dps = ttm(payments, today)
+    info = net_dividend(dps, price, usd_pln_rate()) if dps > 0 else None
+    return info, criteria
+
+
+def extra_criteria(company: dict, sec: SecClient, ticker: str) -> list[dict]:
+    """Criteria that need data beyond the company's own filings (peers, prices)."""
+    return industry_criteria(company, sec) + history_criteria(company, company.get("facts"), ticker)

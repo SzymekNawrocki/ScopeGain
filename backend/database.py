@@ -4,10 +4,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 # Adres bazy: "sterownik://uzytkownik:haslo@host:port/nazwa_bazy".
-# Domyslnie lokalny kontener; w warstwie 5 przeniesiemy sekret do .env.
+# W docker compose przychodzi z env (.env); domyslnie lokalny Postgres.
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
-    "postgresql+psycopg://postgres:scopegain@localhost:5432/scopegain",
+    "postgresql+psycopg://scopegain:scopegain@localhost:5432/scopegain",
 )
 
 # engine = pula polaczen do bazy. Jeden na cala aplikacje.

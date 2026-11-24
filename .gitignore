@@ -11,3 +11,7 @@ __pycache__/
 # Smieci systemowe
 .DS_Store
 Thumbs.db
+
+# Node / Next
+node_modules/
+.next/

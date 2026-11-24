@@ -1,5 +1,5 @@
 // Blokowy panel stanu: ladowanie / blad / pusto. Ten sam "cyber-chamfer"
-// container byl kopiowany osobno w page.tsx, MarketScope i PortfolioVsMarket -
+// container was copied in several screens -
 // teraz jeden komponent z wariantem koloru. Server Component (brak stanu).
 const VARIANT = {
   loading: "border border-border text-accent",

@@ -1,142 +1,68 @@
-# Kontekst domenowy ScopeGain
+# ScopeGain domain context
 
-Kanoniczny język tego projektu. Definicje mówią, **czym coś jest**, a nie jak to
-zrobić — to glosariusz, nie specyfikacja i nie brudnopis. Decyzje projektowe żyją
-w `docs/adr/`.
+The canonical language of this project. Definitions say **what a thing is**, not how
+to build it. Decisions live in `docs/adr/` (start with
+[ADR-0005](docs/adr/0005-local-objective-company-analyzer.md)).
 
-Zasada nadrzędna: apka **mówi, czego nie wie**, zamiast zmyślać. Większość pojęć
-poniżej istnieje właśnie po to, żeby dało się to powiedzieć precyzyjnie.
-
----
-
-## Co użytkownik ma
-
-**Portfel** — nazwany koszyk pozycji („Emerytura", „Spekulacje"). Reprezentuje to, co
-użytkownik **posiada**.
-_Unikaj_: konto, watchlista.
-
-**Pozycja** — ile sztuk danej spółki użytkownik ma **teraz**. Odpowiada na pytanie
-„co mam dziś”.
-_Unikaj_: transakcja, holding.
-
-**Transakcja** — pojedyncze kupno albo sprzedaż z datą i ceną. Log jest
-append-only i istnieje **obok** pozycji.
-_Unikaj_: zlecenie (order) — apka niczego nie zleca.
-
-**Rekoncyliacja** — porównanie stanu netto wyliczonego z logu transakcji ze stanem
-pozycji. Gdy się rozjeżdżają, apka **mówi to wprost**, zamiast wybierać wygodniejszą
-wersję. Źródłem prawdy dla ścieżki historycznej jest log.
+Guiding rule: the app **says what it does not know** instead of guessing.
 
 ---
 
-## Co użytkownik rozważa
+## What the app looks at
 
-**Temat** — pomysł inwestycyjny użytkownika („Uran", „Kwanty", „Woda"), reprezentowany
-jako koszyk **kuratorowany przez niego**. Temat **nie jest** wynikiem wyszukiwarki ani
-kategorią źródła danych. Patrz [ADR-0002](docs/adr/0002-temat-jest-koszykiem-kuratorowanym.md).
-_Unikaj_: sektor, branża, watchlista.
+**Company** — a single listed company identified by its ticker. Analysis is about one
+company at a time. _Avoid_: stock pick, position.
 
-**Branża** — kategoria nadana spółce przez **dostawcę danych** (np. „Uranium"). Jest
-ich 145 i są zamkniętą listą. Bywa punktem wyjścia dla tematu, ale nim nie jest:
-„uran” jest branżą, „kwanty” nie są i nie będą.
-_Unikaj_: temat, sektor (sektor to szerszy poziom: „Energia”).
-Uwaga o kompletności: lista spółek branży, którą oddaje źródło (`yf.Industry`), to
-**ranking „top”, a nie spis** — gubi liderów (przy uranie pomija Cameco, dokładnie
-jak wyszukiwarka po nazwie). Dlatego przeglądanie po branży niesie jawne
-zastrzeżenie, a luki uzupełnia się rozbiciem ETF i szukaniem po nazwie.
+**Watchlist** — tickers the owner keeps an eye on, each with an optional note. It
+remembers the last verdict so it can report a **Verdict change**. _Avoid_: portfolio,
+theme, thesis.
 
-**Kandydat** — spółka zaproponowana użytkownikowi do tematu. Kandydatem się bywa,
-składnikiem tematu zostaje się dopiero decyzją użytkownika.
+## What the app says
 
-**Pochodzenie** — skąd kandydat się wziął („z branży Uranium”, „z ETF QTUM”, „dodane
-ręcznie”). Widoczne zawsze, bo bez tego użytkownik nie wie, czemu ma ufać liście.
+**Verdict** — 🟢 worth considering / 🟡 borderline / 🔴 not worth it. It follows from a
+fixed, documented rule over the **Blocks** ([METHODOLOGY](docs/METHODOLOGY.md#verdict-rule)),
+never from anyone's opinion. It describes
+the company today; it does not promise a return.
 
-**Obserwacja** — spółka w temacie wraz z całym **planem decyzji**: Tezą,
-Unieważnieniem, opcjonalnym warunkiem wejścia oraz **datą i ceną z momentu dodania**.
-Ta para liczb (data + cena) pozwala później rozliczyć użytkownika z jego własnego typu.
-_Unikaj_: pozycja (obserwacja to „rozważam”, nie „mam”).
+**Block** — a group of criteria: **Trust**, **Dividend**, **Valuation**, **Health**.
+Each block shows how many criteria passed, failed or lacked data.
 
-**Teza** — napisany przez użytkownika powód, dla którego dodał spółkę („deficyt podaży
-uranu”). Apka konfrontuje ją później z tym, co się faktycznie stało.
+**Criterion** — one check with a value, a threshold and a **Source**. Outcome is
+✅ passed, 🟡 middle zone (where the source defines one, e.g. Altman's grey zone),
+❌ failed or ⚪ no data. "Not applicable" (e.g. Altman for a bank) is not a data gap.
 
-**Unieważnienie** — zapisany z góry warunek, przy którym użytkownik uzna, że się mylił:
-**cena progu** („poniżej 55”) **albo** opisany warunek („jeśli deficyt uranu się nie
-zmaterializuje do 2027”). Bez niego decyzji nie da się później uczciwie rozliczyć —
-typ bez warunku porażki wygląda zawsze na trafny. To dyscyplina, nie sygnał (ADR-0001).
-_Unikaj_: stop-loss (to nie zlecenie ani mechanika day-tradingu — patrz ADR-0003).
+**Knock-out criterion** — a criterion that ends the analysis with 🔴 on its own.
+Currently: Beneish M-Score above the manipulation threshold.
 
-**Realizacja** — **potwierdzone** powiązanie Obserwacji z Transakcją, która wykonała ten
-typ. Apka ją tylko **proponuje** (widzi kupno tej spółki po dacie dodania typu i pyta
-„to realizacja tego typu?”), a użytkownik **potwierdza** — bo samo posiadanie tickera nie
-znaczy, że kupił pod tę tezę (mógł mieć od dawna albo w innym portfelu). Bez potwierdzenia
-typ pozostaje **nietknięty**. To ta sama zasada co przy kandydatach (ADR-0002): apka
-podsuwa, użytkownik decyduje.
-_Unikaj_: „acted” jako automatyczna flaga z dopasowania tickera.
+**Pros and cons** — the passed and failed criteria written as plain arguments, each
+with its number, threshold and what it means.
 
----
+**Data gaps** — criteria that could not be checked. Shown above the verdict, because a
+verdict from 5 criteria must not look as certain as one from 15.
 
-## Co apka mówi
+**Source** — the publication a threshold comes from (e.g. Altman 1968). Shown next to
+the criterion.
 
-**Werdykt** — wniosek wyrażony po ludzku wraz z oceną 🟢🟡🔴. Apka **nie wydaje zleceń
-kup/sprzedaj** ([ADR-0001](docs/adr/0001-narzedzie-do-myslenia-nie-robo-doradca.md)).
+**Verdict change** — a watchlist company's verdict moved after a new report, with the
+criterion that caused it (e.g. "🟢 → 🟡: Altman Z fell from 3.4 to 2.6").
 
-**Werdykt ryzyka** — werdykt o **pojedynczej spółce**. Ocenia wyłącznie ryzyko
-(„niskie / podwyższone / wysokie”), nigdy jakość. „Mocny” przy spółce czytałoby się
-jak polecenie zakupu — to ta sama decyzja co ADR-0001, tylko widziana z bliska.
-_Unikaj_: rekomendacja, ocena spółki.
+## How the app measures
 
-**Zastrzeżenie (caveat)** — jawne ograniczenie werdyktu, wyświetlane **przy nim**,
-nie w stopce. Werdykt o jednej spółce czyta się jak porada dużo mocniej niż werdykt
-o własnym portfelu.
+**Industry percentile** — where a company's metric sits among companies of the same
+industry, from SEC `frames`. A statistic, not an opinion.
 
-**Braki danych (data_gaps)** — metryki, których zabrakło i których reguły pominięto.
-Bez tego werdykt policzony z 2 reguł wyglądałby tak samo pewnie jak z 5. To kłamstwo
-przez przemilczenie, więc mówimy wprost.
+**Own-history valuation** — today's valuation multiple compared with the company's
+own median over its available history.
 
-**Punkt odniesienia** — neutralna miara, względem której widać rozjazd (np. równe wagi
-przy rebalansingu). **Nie** jest poradą, co kupić.
-_Unikaj_: cel, rekomendacja.
+**Net dividend (PLN)** — the forward dividend that lands in the owner's pocket: after
+the source-country withholding tax and the Polish top-up to 19%, converted at the NBP
+rate. _Avoid_: dividend yield (that is gross).
 
-**Rozliczenie typu** — konfrontacja Obserwacji z tym, co się faktycznie stało: ruch od
-ceny dodania, czy zadziałało Unieważnienie, czy użytkownik zadziałał (kupił). Liczone na
-**całej puli** typów, nie tylko na trafionych — inaczej uczyłoby FOMO (pokazywanie samych
-wygranych to ta sama nieuczciwość, którą krytykuje się u sprzedawców strategii). Nigdy
-nie mówi „trzeba było kupić” — to złamałoby ADR-0001 tylnymi drzwiami. Odbija decyzję
-użytkownika, nie wydaje nowej.
-_Unikaj_: wynik, żal, „a nie mówiłem”.
+**Dividend safety** — whether the dividend is covered by free cash flow, how leveraged
+the company is and how long it has gone without a cut.
 
-**Trafność typu** — kierunek ruchu ceny od momentu dodania względem tezy (na plus / na
-minus). Opisuje fakt, nie ocenia jakości spółki i nie jest sygnałem.
+## What the app does not do
 
-**Hit rate** — udział trafionych typów w całej puli. Miara **dyscypliny selekcji**
-(„ile z moich pomysłów faktycznie zadziałało”), a nie zachęta do handlu.
-
----
-
-## Jak apka liczy
-
-**Backtest hipotetyczny** — krzywa, która rzutuje **dzisiejsze** wagi portfela na całą
-historię. To hipoteza „gdybym od początku trzymał to, co mam dziś”, a nie przeszłość
-użytkownika. Musi być oznaczona jako hipoteza.
-_Unikaj_: mój wynik, realny zwrot.
-
-**Realna ścieżka** — krzywa odtworzona z **logu transakcji**: co użytkownik naprawdę
-trzymał każdego dnia. Liczona metodą time-weighted, żeby wpłata gotówki nie wyglądała
-jak zysk.
-
-**Zachowanie (behavior gap)** — różnica między wynikiem rynku a wynikiem użytkownika
-wynikająca z **momentów** jego decyzji, nie z doboru spółek.
-
-**Benchmark** — „rynek”, do którego wszystko porównujemy: ETF SPY (S&P 500).
-Reprezentuje alternatywę „nic nie rób, kup cały rynek”.
-
-**VaR** — próg straty w normalnie zły okres (np. 5% najgorszych dni).
-_Unikaj_: maksymalna strata.
-
-**CVaR** — średnia strata **w ogonie** za progiem VaR: „a jak już jest źle, to ile”.
-
-**Stress test** — co zrobiłby z portfelem powtórzony **historyczny** krach
-(2008, COVID).
-
-**Pokrycie** — jaka część portfela miała dane w danym oknie. Niskie pokrycie unieważnia
-wnioski, więc jest widoczne.
+**Link-out** — a glossary entry that points to a free external tool instead of
+rebuilding it (Biznesradar for Polish stocks, justETF for ETFs, stockanalysis.com for
+long financial history). Rule: free and good elsewhere → link; paywalled → build here.

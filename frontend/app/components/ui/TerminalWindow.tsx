@@ -1,6 +1,6 @@
 // Ramka "okna terminala": pasek z trzema kropkami + tytul, potem tresc.
-// Uzywana przez karty portfela, panel rynku i panel analizy - wczesniej ten
-// sam markup byl skopiowany w kazdym z tych plikow osobno.
+// Used by every screen (company, watchlist) - previously the same markup
+// was copied into each file separately.
 // Bez stanu/handlerow -> Server Component, dziala tez wewnatrz komponentow klienckich.
 export function TerminalWindow({
   title,

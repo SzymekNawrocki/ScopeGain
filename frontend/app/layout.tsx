@@ -17,7 +17,7 @@ const jetbrains = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "ScopeGain // Terminal",
-  description: "Analiza portfela inwestycyjnego — hacked feed.",
+  description: "Obiektywna analiza spółek — fakty, statystyki i braki danych.",
 };
 
 export default function RootLayout({

@@ -11,7 +11,7 @@ import { searchStocks, StockSearchHit } from "../lib/api";
 //
 // UWAGA na granice zrodla: szukanie po NAZWIE dziala dobrze, ale TEMATYCZNE
 // nie - "uranium" nie zwroci Cameco, mimo ze jego branza to wprost "Uranium".
-// Dlatego to jest wyszukiwarka nazw, nie tematow (ADR-0002).
+// Dlatego to jest wyszukiwarka nazw, nie tematow.
 
 const DEBOUNCE_MS = 300;
 const MIN_ZNAKOW = 2;
