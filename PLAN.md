@@ -27,7 +27,7 @@
 
 - [x] **0. Cleanup** — tag `v0-portfolio`; remove portfolio, journal, Discover, charts
       and auth; ADR-0005; new CONTEXT and PLAN; Docker Compose; CI for tests.
-- [ ] **1. Data** — ticker → CIK, SEC `companyfacts`, cache in Postgres,
+- [x] **1. Data** — ticker → CIK, SEC `companyfacts`, cache in Postgres,
       max 10 requests/s, User-Agent from `.env`.
 - [ ] **2. Trust** — Piotroski F-Score, Altman Z-Score, Beneish M-Score (knock-out) as
       pure functions, tested on known examples from the literature.
