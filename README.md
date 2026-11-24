@@ -11,10 +11,15 @@ and [PLAN.md](PLAN.md).
 
 ```sh
 cp .env.example .env
+# set SEC_USER_AGENT in .env, e.g. "ScopeGain your-address@example.com"
 docker compose up --build
 ```
 
-- Frontend: http://127.0.0.1:3000
+SEC asks every client to declare a contact e-mail. Without `SEC_USER_AGENT` the app
+does not call SEC and the company card shows a clear error.
+
+- Frontend: http://127.0.0.1:3000 (company card), `/obserwowane` (watchlist),
+  `/slownik` (glossary). Open a company directly with `/?t=KO`.
 - API: http://127.0.0.1:8000 (docs at `/docs`)
 
 Everything is published on 127.0.0.1 only. There is no login.
@@ -32,3 +37,8 @@ cd ../frontend
 npm ci
 npm run dev
 ```
+
+## How the verdict works
+
+See [docs/METHODOLOGY.md](docs/METHODOLOGY.md): every criterion, formula, threshold
+and source, and the fixed rule that turns them into 🟢/🟡/🔴.

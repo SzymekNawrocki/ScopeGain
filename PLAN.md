@@ -37,7 +37,7 @@
 - [x] **5. Net dividends (PLN)** — verify tax rules first (podatki.gov.pl, double tax
       treaties: PIT-38 vs PIT-36/ZG); NBP rates; dividend safety.
 - [x] **6. Watchlist** — ticker + note; verdict change with its reason after a new report.
-- [ ] **7. Glossary with link-outs** — what a term means, whether ScopeGain computes it,
+- [x] **7. Glossary with link-outs** — what a term means, whether ScopeGain computes it,
       and where to check it for free. Grows a little in every slice.
 
 ## Out of scope

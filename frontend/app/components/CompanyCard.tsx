@@ -7,6 +7,7 @@ import {
   Grade,
   Outcome,
 } from "../lib/api";
+import { Tooltip } from "./ui/Tooltip";
 
 // The company card: verdict first, then pros/cons, then every criterion with its
 // threshold and source. Data gaps sit above the blocks, not in a footer, so a
@@ -146,7 +147,10 @@ function CriterionRow({ c }: { c: Criterion }) {
     <li className="font-mono text-sm">
       <div className="flex flex-wrap items-baseline gap-x-3">
         <span aria-label={c.outcome}>{OUTCOME_ICON[c.outcome]}</span>
-        <span className="text-foreground">{c.name}</span>
+        <span className="text-foreground">
+          {c.name}
+          <Tooltip term={c.id} />
+        </span>
         <span className={`font-bold ${OUTCOME_TEXT[c.outcome]}`}>{c.display}</span>
         {c.knockout && (
           <span className="border border-destructive px-1.5 text-[11px] uppercase text-destructive">

@@ -83,12 +83,10 @@ export function Tooltip({ term }: { term: string }) {
             <p className="mt-2 font-mono text-xs leading-relaxed text-muted-foreground">
               {entry.why}
             </p>
-            {entry.diy && (
-              <p className="mt-2 border-t border-border pt-2 font-mono text-[11px] leading-relaxed text-accent-tertiary">
-                {"// policz sam: "}
-                <span className="text-muted-foreground">{entry.diy}</span>
-              </p>
-            )}
+            <p className="mt-2 border-t border-border pt-2 font-mono text-[11px] text-accent-tertiary">
+              {entry.computed === "tak" ? "// liczy ScopeGain" : "// sprawdzisz poza ScopeGain"}
+              {" · pełne hasło w Słowniku"}
+            </p>
           </div>,
           document.body,
         )}
